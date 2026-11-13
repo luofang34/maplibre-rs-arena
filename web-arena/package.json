@@ -1,0 +1,23 @@
+{
+  "name": "maplibre-rs-arena-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 5179",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --port 4179"
+  },
+  "dependencies": {
+    "@oddbird/popover-polyfill": "^0.6.1",
+    "invokers-polyfill": "^0.5.2",
+    "maplibre-gl": "^5.3.0",
+    "pixelmatch": "^6.0.0"
+  },
+  "devDependencies": {
+    "@types/pixelmatch": "^5.2.6",
+    "typescript": "^5.8.2",
+    "vite": "^6.2.2",
+    "wrangler": "^4.10.0"
+  }
+}

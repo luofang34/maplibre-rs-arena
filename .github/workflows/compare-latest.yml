@@ -1,0 +1,140 @@
+name: Compare Latest & Deploy Arena
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      exp_ref:
+        description: "maplibre-rs-experimental branch, tag, or commit SHA"
+        required: false
+        default: "main"
+        type: string
+      mln_ref:
+        description: "mln-rs branch, tag, or commit SHA (100% unmodified)"
+        required: false
+        default: "main"
+        type: string
+      deploy:
+        description: "Deploy built workbench to Cloudflare"
+        required: false
+        default: true
+        type: boolean
+      deploy_target:
+        description: "Cloudflare target (workers uses wrangler.jsonc Static Assets; pages uses Cloudflare Pages)"
+        required: false
+        default: "workers"
+        type: choice
+        options:
+          - workers
+          - pages
+
+permissions:
+  contents: read
+
+concurrency:
+  group: arena-compare-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    name: Pull Latest Dual Engines · Build WASM · Deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      EXP_REF: ${{ inputs.exp_ref || 'main' }}
+      MLN_REF: ${{ inputs.mln_ref || 'main' }}
+      DEPLOY_TARGET: ${{ inputs.deploy_target || 'workers' }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN || secrets.CF_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || secrets.CF_ACCOUNT_ID }}
+    steps:
+      - name: Checkout maplibre-rs-arena
+        uses: actions/checkout@v4
+
+      - name: Pull latest maplibre-rs-experimental & mln-rs
+        run: ./scripts/sync-engines.sh remote "$EXP_REF" "$MLN_REF"
+
+      - name: Install prebuilt just & wasm-bindgen 0.2.130
+        uses: taiki-e/install-action@v2
+        with:
+          tool: just,wasm-bindgen@0.2.130
+
+      - name: Install binaryen (wasm-opt)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download --repo WebAssembly/binaryen --pattern 'binaryen-*-x86_64-linux.tar.gz' --output - |
+            tar -xz -C "$RUNNER_TEMP"
+          echo "$(echo "$RUNNER_TEMP"/binaryen-version_*)/bin" >> "$GITHUB_PATH"
+
+      - name: Install FlatBuffers compiler (flatc v25.12.19)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/flatc"
+          if gh release download v25.12.19 --repo google/flatbuffers --pattern 'Linux.flatc.binary.*.zip' --dir "$RUNNER_TEMP/flatc"; then
+            unzip -q "$RUNNER_TEMP/flatc/"*.zip -d "$RUNNER_TEMP/flatc"
+            chmod +x "$RUNNER_TEMP/flatc/flatc"
+            echo "$RUNNER_TEMP/flatc" >> "$GITHUB_PATH"
+          else
+            git clone --depth 1 --branch v25.12.19 https://github.com/google/flatbuffers.git "$RUNNER_TEMP/fb-src"
+            cmake -S "$RUNNER_TEMP/fb-src" -B "$RUNNER_TEMP/fb-src/build" -G "Unix Makefiles" -DFLATBUFFERS_BUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release
+            cmake --build "$RUNNER_TEMP/fb-src/build" --parallel
+            sudo cmake --install "$RUNNER_TEMP/fb-src/build"
+          fi
+          flatc --version || "$RUNNER_TEMP/flatc/flatc" --version
+
+      - name: Install Rust toolchains (mln-rs pinned + nightly build-std)
+        run: |
+          (cd engines/mln-rs && rustup toolchain install --profile minimal --no-self-update && rustup target add wasm32-unknown-unknown)
+          rustup toolchain install nightly --profile minimal --component rust-src --target wasm32-unknown-unknown
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Rust build cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            native-arena
+            engines/mln-rs
+            engines/maplibre-rs-experimental
+
+      - name: Run native-arena unit tests & capability matrix audit
+        run: |
+          cargo test --manifest-path native-arena/Cargo.toml
+          cargo run --manifest-path native-arena/Cargo.toml -- matrix
+          cat reports/latest-matrix.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Build dual-engine WASM bundles (mln-rs WebGPU/WebGL2 + exp-rs ST/MT)
+        run: ./scripts/build-wasm-all.sh release
+
+      - name: Build web-arena static workbench
+        run: |
+          cd web-arena
+          npm install --no-audit --no-fund
+          npm run build
+
+      - name: Upload built Arena bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: maplibre-rs-arena-dist
+          path: |
+            web-arena/dist
+            reports/latest-matrix.md
+            engines.lock.json
+
+      - name: Notice when Cloudflare secrets are not configured yet
+        if: ${{ (github.event_name == 'push' || inputs.deploy != false) && (env.CLOUDFLARE_API_TOKEN == '' || env.CLOUDFLARE_ACCOUNT_ID == '') }}
+        run: |
+          echo "::notice::Cloudflare secrets (CLOUDFLARE_API_TOKEN & CLOUDFLARE_ACCOUNT_ID) are not set yet; skipping live deployment."
+
+      - name: Deploy to Cloudflare Workers Static Assets
+        if: ${{ (github.event_name == 'push' || inputs.deploy != false) && env.DEPLOY_TARGET == 'workers' && env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != '' }}
+        run: npx --prefix web-arena wrangler deploy --config wrangler.jsonc
+
+      - name: Deploy to Cloudflare Pages (optional mode)
+        if: ${{ (github.event_name == 'push' || inputs.deploy != false) && env.DEPLOY_TARGET == 'pages' && env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != '' }}
+        run: npx --prefix web-arena wrangler pages deploy web-arena/dist --project-name=maplibre-rs-arena --branch=main

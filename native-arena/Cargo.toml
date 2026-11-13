@@ -1,0 +1,17 @@
+[package]
+name = "maplibre-rs-arena-native"
+version = "0.1.0"
+edition = "2021"
+description = "ABBA headless benchmark orchestrator, capability auditor, and perceptual PNG diff runner for maplibre-rs-experimental vs mln-rs"
+
+[[bin]]
+name = "native-arena"
+path = "src/main.rs"
+
+[dependencies]
+png = "0.17"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"

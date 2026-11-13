@@ -1,0 +1,142 @@
+{
+  "version": 8,
+  "name": "Arena S5 — 3D DEM Terrain & Vector Draping (Alps)",
+  "glyphs": "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
+  "sources": {
+    "openmaptiles": {
+      "type": "vector",
+      "url": "https://tiles.openfreemap.org/planet"
+    },
+    "dem": {
+      "type": "raster-dem",
+      "encoding": "terrarium",
+      "tileSize": 256,
+      "maxzoom": 14,
+      "tiles": [
+        "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"
+      ]
+    }
+  },
+  "terrain": {
+    "source": "dem",
+    "exaggeration": 1.35
+  },
+  "sky": {
+    "sky-color": "#1e3a5f",
+    "horizon-color": "#93c5fd",
+    "sky-horizon-blend": 0.5
+  },
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": {
+        "background-color": "#e7ece6"
+      }
+    },
+    {
+      "id": "landcover-glacier",
+      "type": "fill",
+      "source": "openmaptiles",
+      "source-layer": "landcover",
+      "filter": ["in", ["get", "class"], ["literal", ["ice", "wood", "grass"]]],
+      "paint": {
+        "fill-color": [
+          "match",
+          ["get", "class"],
+          "ice",
+          "#f0f9ff",
+          "wood",
+          "#bbf7d0",
+          "#dcfce7"
+        ],
+        "fill-opacity": 0.6
+      }
+    },
+    {
+      "id": "water",
+      "type": "fill",
+      "source": "openmaptiles",
+      "source-layer": "water",
+      "paint": {
+        "fill-color": "#38bdf8"
+      }
+    },
+    {
+      "id": "terrain-hillshade",
+      "type": "hillshade",
+      "source": "dem",
+      "paint": {
+        "hillshade-exaggeration": 0.65,
+        "hillshade-shadow-color": "#1e293b",
+        "hillshade-highlight-color": "#ffffff",
+        "hillshade-accent-color": "#334155"
+      }
+    },
+    {
+      "id": "roads-draped",
+      "type": "line",
+      "source": "openmaptiles",
+      "source-layer": "transportation",
+      "minzoom": 8,
+      "paint": {
+        "line-color": [
+          "match",
+          ["get", "class"],
+          "motorway",
+          "#f97316",
+          "primary",
+          "#eab308",
+          "#64748b"
+        ],
+        "line-width": ["interpolate", ["linear"], ["zoom"], 8, 1.0, 15, 5.0]
+      }
+    },
+    {
+      "id": "alpine-buildings",
+      "type": "fill-extrusion",
+      "source": "openmaptiles",
+      "source-layer": "building",
+      "minzoom": 13,
+      "paint": {
+        "fill-extrusion-color": "#cbd5e1",
+        "fill-extrusion-height": ["coalesce", ["get", "render_height"], 10],
+        "fill-extrusion-base": ["coalesce", ["get", "render_min_height"], 0],
+        "fill-extrusion-opacity": 0.9
+      }
+    },
+    {
+      "id": "mountain-peaks-and-places",
+      "type": "symbol",
+      "source": "openmaptiles",
+      "source-layer": "mountain_peak",
+      "minzoom": 9,
+      "layout": {
+        "text-field": ["coalesce", ["get", "name"], "Peak"],
+        "text-font": ["Noto Sans Regular"],
+        "text-size": 12
+      },
+      "paint": {
+        "text-color": "#0f172a",
+        "text-halo-color": "#ffffff",
+        "text-halo-width": 1.5
+      }
+    },
+    {
+      "id": "place-labels",
+      "type": "symbol",
+      "source": "openmaptiles",
+      "source-layer": "place",
+      "layout": {
+        "text-field": ["coalesce", ["get", "name:en"], ["get", "name"]],
+        "text-font": ["Noto Sans Regular"],
+        "text-size": 13
+      },
+      "paint": {
+        "text-color": "#0f172a",
+        "text-halo-color": "#ffffff",
+        "text-halo-width": 1.6
+      }
+    }
+  ]
+}
