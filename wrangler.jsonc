@@ -1,0 +1,9 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "maplibre-rs-arena",
+  "compatibility_date": "2026-01-01",
+  "assets": {
+    "directory": "./web-arena/dist",
+    "not_found_handling": "single-page-application"
+  }
+}

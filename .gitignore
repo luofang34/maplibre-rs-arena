@@ -1,0 +1,17 @@
+# Build & dependency outputs
+target/
+node_modules/
+dist/
+.wrangler/
+
+# Cloned or symlinked upstream engine worktrees
+engines/
+web-arena/public/wasm/
+web-arena/dist/
+reports/runs/
+
+# OS & editor files
+.DS_Store
+*.swp
+.env
+.env.*
