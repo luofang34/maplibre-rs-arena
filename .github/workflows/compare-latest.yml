@@ -72,8 +72,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p "$RUNNER_TEMP/flatc"
-          if gh release download v25.12.19 --repo google/flatbuffers --pattern 'Linux.flatc.binary.*.zip' --dir "$RUNNER_TEMP/flatc"; then
-            unzip -q "$RUNNER_TEMP/flatc/"*.zip -d "$RUNNER_TEMP/flatc"
+          if gh release download v25.12.19 --repo google/flatbuffers --pattern 'Linux.flatc.binary.g++-*.zip' --dir "$RUNNER_TEMP/flatc"; then
+            ZIP_FILE="$(ls "$RUNNER_TEMP/flatc/"*.zip | head -n 1)"
+            unzip -q "$ZIP_FILE" -d "$RUNNER_TEMP/flatc"
             chmod +x "$RUNNER_TEMP/flatc/flatc"
             echo "$RUNNER_TEMP/flatc" >> "$GITHUB_PATH"
           else
