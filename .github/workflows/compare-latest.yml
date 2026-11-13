@@ -54,6 +54,12 @@ jobs:
       - name: Pull latest maplibre-rs-experimental & mln-rs
         run: ./scripts/sync-engines.sh remote "$EXP_REF" "$MLN_REF"
 
+      - name: Install system dependencies (protoc)
+        run: |
+          sudo apt-get update -y -qq
+          sudo apt-get install -y protobuf-compiler libwayland-dev libxkbcommon-dev
+          protoc --version
+
       - name: Install prebuilt just & wasm-bindgen 0.2.130
         uses: taiki-e/install-action@v2
         with:
@@ -98,6 +104,7 @@ jobs:
       - name: Rust build cache
         uses: Swatinem/rust-cache@v2
         with:
+          cache-on-failure: true
           workspaces: |
             native-arena
             engines/mln-rs
