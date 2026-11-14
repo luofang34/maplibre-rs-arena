@@ -54,7 +54,7 @@ export async function createGlJsRunner(
     );
   };
 
-  emitStatus({ state: 'loading', message: '正在加载 MapLibre GL JS 参考基线…' });
+  emitStatus({ state: 'loading', message: 'Loading MapLibre GL JS reference baseline…' });
   const startAt = performance.now();
   const resolvedStyleUrl = new URL(cfg.styleUrl, location.origin).href;
 

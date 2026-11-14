@@ -1,6 +1,6 @@
 # MapLibre Rust Arena — Latest Matrix Report
 
-- **Generated At**: `2026-11-13T23:23:59Z`
+- **Generated At**: `2026-11-14T00:32:35Z`
 - **`maplibre-rs-experimental` rev**: `78b4001634`
 - **`mln-rs` rev**: `6768c7f5b4`
 - **Hardware Profile**: Static Capability Audit on macos aarch64 (pass `--live` to run local GPU ABBA rounds)
@@ -9,13 +9,13 @@
 
 | Dimension | Domain | `maplibre-rs-experimental` | `mln-rs` |
 | :--- | :--- | :--- | :--- |
-| WebGPU 渲染管线与并发模型 | Web | **Full** — wgpu WebGPU (支持单线程 Worker 池与 COEP: credentialless 下的 SharedArrayBuffer 多线程池) | **Full** — OffscreenCanvas + 独立 Map Worker + MessageChannel Tile Workers，零 COOP/COEP 依赖，内置 WebGL2 回退 |
-| 运行时整套样式热切换 (setStyle) | Web | **Full** — 已支持运行时完整样式切换 | **Full** — 原生支持 WebMap::set_style_url 与预加载资源复用 |
-| 3D DEM 高程地形网格与矢量贴地 (style.terrain) | 3D & Terrain | **Full** — 完整支持 raster-dem (terrarium/mapbox)、3D 地形网格起伏、DrapeCache 道路/面贴地重绘及海拔防穿模 | **Gap** — 仅支持 2D hillshade 与 color-relief；mln_style 明确返回 the map doesn't draw terrain |
-| 3D 建筑挤压 (fill-extrusion) 与 Globe 球面投影 | 3D & Terrain | **Full** — 支持 fill-extrusion、globe 与 vertical-perspective 投影及 6DoF roll/pitch 相机 | **Full** — 支持 fill-extrusion、projection: globe 及 set_globe_free_bearing 跨极点自由航向 |
-| Native XR 双目立体渲染 (visionOS / HMD Stereo) 与 WebXR | XR & WebXR | **Full** — HeadlessMap::run_xr_frame 原生支持左右眼非对称视锥体 + CoveringPolicy::StereoReuse 双目瓦片共享 + apple/visionos 工程 | **Gap** — 无原生 XR 多视图立体管线或 visionOS / WebXR 目标 |
-| 桌面与移动端原生宿主 + 离线存储 | Desktop & Mobile | **Partial** — 支持 macOS/Linux/Windows/Android/iOS/visionOS winit 宿主，缺少原生 SQLite 离线包管理 | **Full** — 源自 MapLibre Native C++ 完整架构，含 rusqlite 离线存储、HTTP 条件缓存与 C ABI/FFI |
-| 复杂文本塑形 (RTL / Indic / HarfRust) 与本地 CJK 字形 | Style & Text | **Partial** — 支持远程 PBF SDF 字形与碰撞检测；暂缺 HarfRust 连字塑形与本地 CJK Canvas SDF 生成 | **Full** — 按需加载 mln_web_shaper (HarfRust + skrifa + FreeType) 并支持 localIdeographFontFamily 免下载绘制 CJK |
+| WebGPU Render Pipeline & Concurrency Model | Web | **Full** — wgpu WebGPU (supports single-threaded worker pool and SharedArrayBuffer multithreaded pool under COEP: credentialless) | **Full** — OffscreenCanvas + dedicated Map Worker + MessageChannel Tile Workers, zero COOP/COEP requirement, built-in WebGL2 fallback |
+| Runtime Full Style Hot-Swap (setStyle) | Web | **Full** — Full runtime style hot-swap supported | **Full** — Native WebMap::set_style_url with preloaded resource reuse |
+| 3D DEM Elevation Terrain Mesh & Vector Draping (style.terrain) | 3D & Terrain | **Full** — Full raster-dem (terrarium/mapbox), 3D elevation mesh displacement, DrapeCache vector draping & subterranean camera clamping | **Gap** — 2D hillshade & color-relief only; mln_style explicitly reports "the map doesn't draw terrain" |
+| 3D Building Extrusions (fill-extrusion) & Globe Projection | 3D & Terrain | **Full** — Supports fill-extrusion, globe & vertical-perspective projections with 6DoF roll/pitch camera | **Full** — Supports fill-extrusion, projection: globe & set_globe_free_bearing trans-polar navigation |
+| Native XR Stereo Rendering (visionOS / HMD Stereo) & WebXR | XR & WebXR | **Full** — HeadlessMap::run_xr_frame supports asymmetric per-eye frusta + CoveringPolicy::StereoReuse dual-eye tile sharing + apple/visionos target | **Gap** — No native multi-view stereo XR pipeline or visionOS / WebXR target |
+| Desktop & Mobile Native Host + Offline SQLite Cache | Desktop & Mobile | **Partial** — Supports macOS/Linux/Windows/Android/iOS/visionOS winit hosts; lacks built-in SQLite offline pack manager | **Full** — Direct MapLibre Native C++ lineage with rusqlite offline storage, HTTP conditional cache & C ABI/FFI |
+| Complex Script Shaping (RTL / Indic / HarfRust) & Local CJK Glyphs | Style & Text | **Partial** — Remote PBF SDF glyphs & collision placement; lacks HarfRust ligature shaping and local CJK Canvas SDF generation | **Full** — On-demand mln_web_shaper (HarfRust + skrifa + FreeType) plus zero-download localIdeographFontFamily CJK rendering |
 
 ## 2. Native Headless ABBA Benchmarks
 

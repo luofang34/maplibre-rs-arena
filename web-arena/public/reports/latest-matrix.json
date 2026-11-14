@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-13T23:23:59Z",
+  "generatedAt": "2026-11-14T00:32:35Z",
   "commits": {
     "maplibreRsExperimental": "78b4001634",
     "mlnRs": "6768c7f5b4",
@@ -8,67 +8,67 @@
   "hardwareProfile": "Static Capability Audit on macos aarch64 (pass `--live` to run local GPU ABBA rounds)",
   "capabilities": [
     {
-      "dimension": "WebGPU 渲染管线与并发模型",
+      "dimension": "WebGPU Render Pipeline & Concurrency Model",
       "domain": "Web",
       "expStatus": "Full",
-      "expDetail": "wgpu WebGPU (支持单线程 Worker 池与 COEP: credentialless 下的 SharedArrayBuffer 多线程池)",
+      "expDetail": "wgpu WebGPU (supports single-threaded worker pool and SharedArrayBuffer multithreaded pool under COEP: credentialless)",
       "mlnStatus": "Full",
-      "mlnDetail": "OffscreenCanvas + 独立 Map Worker + MessageChannel Tile Workers，零 COOP/COEP 依赖，内置 WebGL2 回退",
-      "gljsReference": "WebGL2 + Web Worker 池"
+      "mlnDetail": "OffscreenCanvas + dedicated Map Worker + MessageChannel Tile Workers, zero COOP/COEP requirement, built-in WebGL2 fallback",
+      "gljsReference": "WebGL2 + Web Worker pool"
     },
     {
-      "dimension": "运行时整套样式热切换 (setStyle)",
+      "dimension": "Runtime Full Style Hot-Swap (setStyle)",
       "domain": "Web",
       "expStatus": "Full",
-      "expDetail": "已支持运行时完整样式切换",
+      "expDetail": "Full runtime style hot-swap supported",
       "mlnStatus": "Full",
-      "mlnDetail": "原生支持 WebMap::set_style_url 与预加载资源复用",
-      "gljsReference": "map.setStyle() 完整支持"
+      "mlnDetail": "Native WebMap::set_style_url with preloaded resource reuse",
+      "gljsReference": "Full map.setStyle() support"
     },
     {
-      "dimension": "3D DEM 高程地形网格与矢量贴地 (style.terrain)",
+      "dimension": "3D DEM Elevation Terrain Mesh & Vector Draping (style.terrain)",
       "domain": "3D & Terrain",
       "expStatus": "Full",
-      "expDetail": "完整支持 raster-dem (terrarium/mapbox)、3D 地形网格起伏、DrapeCache 道路/面贴地重绘及海拔防穿模",
+      "expDetail": "Full raster-dem (terrarium/mapbox), 3D elevation mesh displacement, DrapeCache vector draping & subterranean camera clamping",
       "mlnStatus": "Gap",
-      "mlnDetail": "仅支持 2D hillshade 与 color-relief；mln_style 明确返回 the map doesn't draw terrain",
-      "gljsReference": "支持 3D DEM 网格与 Draping"
+      "mlnDetail": "2D hillshade & color-relief only; mln_style explicitly reports \"the map doesn't draw terrain\"",
+      "gljsReference": "Full 3D DEM mesh & vector draping"
     },
     {
-      "dimension": "3D 建筑挤压 (fill-extrusion) 与 Globe 球面投影",
+      "dimension": "3D Building Extrusions (fill-extrusion) & Globe Projection",
       "domain": "3D & Terrain",
       "expStatus": "Full",
-      "expDetail": "支持 fill-extrusion、globe 与 vertical-perspective 投影及 6DoF roll/pitch 相机",
+      "expDetail": "Supports fill-extrusion, globe & vertical-perspective projections with 6DoF roll/pitch camera",
       "mlnStatus": "Full",
-      "mlnDetail": "支持 fill-extrusion、projection: globe 及 set_globe_free_bearing 跨极点自由航向",
-      "gljsReference": "支持 fill-extrusion 与 Globe"
+      "mlnDetail": "Supports fill-extrusion, projection: globe & set_globe_free_bearing trans-polar navigation",
+      "gljsReference": "Full fill-extrusion & Globe support"
     },
     {
-      "dimension": "Native XR 双目立体渲染 (visionOS / HMD Stereo) 与 WebXR",
+      "dimension": "Native XR Stereo Rendering (visionOS / HMD Stereo) & WebXR",
       "domain": "XR & WebXR",
       "expStatus": "Full",
-      "expDetail": "HeadlessMap::run_xr_frame 原生支持左右眼非对称视锥体 + CoveringPolicy::StereoReuse 双目瓦片共享 + apple/visionos 工程",
+      "expDetail": "HeadlessMap::run_xr_frame supports asymmetric per-eye frusta + CoveringPolicy::StereoReuse dual-eye tile sharing + apple/visionos target",
       "mlnStatus": "Gap",
-      "mlnDetail": "无原生 XR 多视图立体管线或 visionOS / WebXR 目标",
-      "gljsReference": "无官方双目 Stereo 瓦片共享管线"
+      "mlnDetail": "No native multi-view stereo XR pipeline or visionOS / WebXR target",
+      "gljsReference": "No official dual-eye stereo tile-sharing pipeline"
     },
     {
-      "dimension": "桌面与移动端原生宿主 + 离线存储",
+      "dimension": "Desktop & Mobile Native Host + Offline SQLite Cache",
       "domain": "Desktop & Mobile",
       "expStatus": "Partial",
-      "expDetail": "支持 macOS/Linux/Windows/Android/iOS/visionOS winit 宿主，缺少原生 SQLite 离线包管理",
+      "expDetail": "Supports macOS/Linux/Windows/Android/iOS/visionOS winit hosts; lacks built-in SQLite offline pack manager",
       "mlnStatus": "Full",
-      "mlnDetail": "源自 MapLibre Native C++ 完整架构，含 rusqlite 离线存储、HTTP 条件缓存与 C ABI/FFI",
-      "gljsReference": "仅 Web 平台"
+      "mlnDetail": "Direct MapLibre Native C++ lineage with rusqlite offline storage, HTTP conditional cache & C ABI/FFI",
+      "gljsReference": "Web platform only"
     },
     {
-      "dimension": "复杂文本塑形 (RTL / Indic / HarfRust) 与本地 CJK 字形",
+      "dimension": "Complex Script Shaping (RTL / Indic / HarfRust) & Local CJK Glyphs",
       "domain": "Style & Text",
       "expStatus": "Partial",
-      "expDetail": "支持远程 PBF SDF 字形与碰撞检测；暂缺 HarfRust 连字塑形与本地 CJK Canvas SDF 生成",
+      "expDetail": "Remote PBF SDF glyphs & collision placement; lacks HarfRust ligature shaping and local CJK Canvas SDF generation",
       "mlnStatus": "Full",
-      "mlnDetail": "按需加载 mln_web_shaper (HarfRust + skrifa + FreeType) 并支持 localIdeographFontFamily 免下载绘制 CJK",
-      "gljsReference": "tiny-sdf + mapbox-gl-rtl-text 插件"
+      "mlnDetail": "On-demand mln_web_shaper (HarfRust + skrifa + FreeType) plus zero-download localIdeographFontFamily CJK rendering",
+      "gljsReference": "tiny-sdf + mapbox-gl-rtl-text plugin"
     }
   ],
   "nativeAbba": [
@@ -119,8 +119,8 @@
     "renderTestsExpPassPct": 78.5,
     "renderTestsMlnPassPct": 94.2,
     "expressionTestsMlnPassPct": 98.1,
-    "terrain3dConformance": "maplibre-rs-experimental 支持 Terrarium/Mapbox DEM + Draping；mln-rs 未实现",
-    "xrStereoConformance": "maplibre-rs-experimental 支持双目非对称视锥体 + StereoReuse；mln-rs 未实现"
+    "terrain3dConformance": "maplibre-rs-experimental supports Terrarium/Mapbox DEM + Draping; unimplemented in mln-rs",
+    "xrStereoConformance": "maplibre-rs-experimental supports dual-eye asymmetric frusta + StereoReuse; unimplemented in mln-rs"
   },
   "soloWebRuns": []
 }

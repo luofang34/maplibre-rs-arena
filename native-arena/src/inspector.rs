@@ -93,79 +93,79 @@ pub fn inspect_capabilities(exp_dir: &Path, mln_dir: &Path) -> Vec<CapabilityRow
 
     vec![
         CapabilityRow {
-            dimension: "WebGPU 渲染管线与并发模型".into(),
+            dimension: "WebGPU Render Pipeline & Concurrency Model".into(),
             domain: "Web".into(),
             exp_status: "Full".into(),
-            exp_detail: "wgpu WebGPU (支持单线程 Worker 池与 COEP: credentialless 下的 SharedArrayBuffer 多线程池)".into(),
+            exp_detail: "wgpu WebGPU (supports single-threaded worker pool and SharedArrayBuffer multithreaded pool under COEP: credentialless)".into(),
             mln_status: "Full".into(),
-            mln_detail: "OffscreenCanvas + 独立 Map Worker + MessageChannel Tile Workers，零 COOP/COEP 依赖，内置 WebGL2 回退".into(),
-            gljs_reference: "WebGL2 + Web Worker 池".into(),
+            mln_detail: "OffscreenCanvas + dedicated Map Worker + MessageChannel Tile Workers, zero COOP/COEP requirement, built-in WebGL2 fallback".into(),
+            gljs_reference: "WebGL2 + Web Worker pool".into(),
         },
         CapabilityRow {
-            dimension: "运行时整套样式热切换 (setStyle)".into(),
+            dimension: "Runtime Full Style Hot-Swap (setStyle)".into(),
             domain: "Web".into(),
             exp_status: if exp_lacks_set_style { "Gap" } else { "Full" }.into(),
             exp_detail: if exp_lacks_set_style {
-                "支持增量 addLayer / setPaintProperty / setGeoJsonData；尚不支持完整 setStyle 热替换".into()
+                "Supports incremental addLayer / setPaintProperty / setGeoJsonData; full setStyle hot-swap not yet implemented".into()
             } else {
-                "已支持运行时完整样式切换".into()
+                "Full runtime style hot-swap supported".into()
             },
             mln_status: "Full".into(),
-            mln_detail: "原生支持 WebMap::set_style_url 与预加载资源复用".into(),
-            gljs_reference: "map.setStyle() 完整支持".into(),
+            mln_detail: "Native WebMap::set_style_url with preloaded resource reuse".into(),
+            gljs_reference: "Full map.setStyle() support".into(),
         },
         CapabilityRow {
-            dimension: "3D DEM 高程地形网格与矢量贴地 (style.terrain)".into(),
+            dimension: "3D DEM Elevation Terrain Mesh & Vector Draping (style.terrain)".into(),
             domain: "3D & Terrain".into(),
             exp_status: if exp_has_terrain { "Full" } else { "Gap" }.into(),
-            exp_detail: "完整支持 raster-dem (terrarium/mapbox)、3D 地形网格起伏、DrapeCache 道路/面贴地重绘及海拔防穿模".into(),
+            exp_detail: "Full raster-dem (terrarium/mapbox), 3D elevation mesh displacement, DrapeCache vector draping & subterranean camera clamping".into(),
             mln_status: if mln_lacks_terrain { "Gap" } else { "Full" }.into(),
             mln_detail: if mln_lacks_terrain {
-                "仅支持 2D hillshade 与 color-relief；mln_style 明确返回 the map doesn't draw terrain".into()
+                "2D hillshade & color-relief only; mln_style explicitly reports \"the map doesn't draw terrain\"".into()
             } else {
-                "检测到上游新增 3D terrain 支持".into()
+                "Upstream 3D terrain implementation detected".into()
             },
-            gljs_reference: "支持 3D DEM 网格与 Draping".into(),
+            gljs_reference: "Full 3D DEM mesh & vector draping".into(),
         },
         CapabilityRow {
-            dimension: "3D 建筑挤压 (fill-extrusion) 与 Globe 球面投影".into(),
+            dimension: "3D Building Extrusions (fill-extrusion) & Globe Projection".into(),
             domain: "3D & Terrain".into(),
             exp_status: "Full".into(),
-            exp_detail: "支持 fill-extrusion、globe 与 vertical-perspective 投影及 6DoF roll/pitch 相机".into(),
+            exp_detail: "Supports fill-extrusion, globe & vertical-perspective projections with 6DoF roll/pitch camera".into(),
             mln_status: "Full".into(),
-            mln_detail: "支持 fill-extrusion、projection: globe 及 set_globe_free_bearing 跨极点自由航向".into(),
-            gljs_reference: "支持 fill-extrusion 与 Globe".into(),
+            mln_detail: "Supports fill-extrusion, projection: globe & set_globe_free_bearing trans-polar navigation".into(),
+            gljs_reference: "Full fill-extrusion & Globe support".into(),
         },
         CapabilityRow {
-            dimension: "Native XR 双目立体渲染 (visionOS / HMD Stereo) 与 WebXR".into(),
+            dimension: "Native XR Stereo Rendering (visionOS / HMD Stereo) & WebXR".into(),
             domain: "XR & WebXR".into(),
             exp_status: if exp_has_xr { "Full" } else { "Gap" }.into(),
-            exp_detail: "HeadlessMap::run_xr_frame 原生支持左右眼非对称视锥体 + CoveringPolicy::StereoReuse 双目瓦片共享 + apple/visionos 工程".into(),
+            exp_detail: "HeadlessMap::run_xr_frame supports asymmetric per-eye frusta + CoveringPolicy::StereoReuse dual-eye tile sharing + apple/visionos target".into(),
             mln_status: if mln_has_xr { "Full" } else { "Gap" }.into(),
             mln_detail: if mln_has_xr {
-                "检测到 XR 模块".into()
+                "Upstream XR module detected".into()
             } else {
-                "无原生 XR 多视图立体管线或 visionOS / WebXR 目标".into()
+                "No native multi-view stereo XR pipeline or visionOS / WebXR target".into()
             },
-            gljs_reference: "无官方双目 Stereo 瓦片共享管线".into(),
+            gljs_reference: "No official dual-eye stereo tile-sharing pipeline".into(),
         },
         CapabilityRow {
-            dimension: "桌面与移动端原生宿主 + 离线存储".into(),
+            dimension: "Desktop & Mobile Native Host + Offline SQLite Cache".into(),
             domain: "Desktop & Mobile".into(),
             exp_status: "Partial".into(),
-            exp_detail: "支持 macOS/Linux/Windows/Android/iOS/visionOS winit 宿主，缺少原生 SQLite 离线包管理".into(),
+            exp_detail: "Supports macOS/Linux/Windows/Android/iOS/visionOS winit hosts; lacks built-in SQLite offline pack manager".into(),
             mln_status: "Full".into(),
-            mln_detail: "源自 MapLibre Native C++ 完整架构，含 rusqlite 离线存储、HTTP 条件缓存与 C ABI/FFI".into(),
-            gljs_reference: "仅 Web 平台".into(),
+            mln_detail: "Direct MapLibre Native C++ lineage with rusqlite offline storage, HTTP conditional cache & C ABI/FFI".into(),
+            gljs_reference: "Web platform only".into(),
         },
         CapabilityRow {
-            dimension: "复杂文本塑形 (RTL / Indic / HarfRust) 与本地 CJK 字形".into(),
+            dimension: "Complex Script Shaping (RTL / Indic / HarfRust) & Local CJK Glyphs".into(),
             domain: "Style & Text".into(),
             exp_status: "Partial".into(),
-            exp_detail: "支持远程 PBF SDF 字形与碰撞检测；暂缺 HarfRust 连字塑形与本地 CJK Canvas SDF 生成".into(),
+            exp_detail: "Remote PBF SDF glyphs & collision placement; lacks HarfRust ligature shaping and local CJK Canvas SDF generation".into(),
             mln_status: if mln_has_shaper { "Full" } else { "Partial" }.into(),
-            mln_detail: "按需加载 mln_web_shaper (HarfRust + skrifa + FreeType) 并支持 localIdeographFontFamily 免下载绘制 CJK".into(),
-            gljs_reference: "tiny-sdf + mapbox-gl-rtl-text 插件".into(),
+            mln_detail: "On-demand mln_web_shaper (HarfRust + skrifa + FreeType) plus zero-download localIdeographFontFamily CJK rendering".into(),
+            gljs_reference: "tiny-sdf + mapbox-gl-rtl-text plugin".into(),
         },
     ]
 }

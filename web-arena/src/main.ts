@@ -399,11 +399,11 @@ async function main() {
   // Pixel Diff calculation
   const computePixelDiff = async () => {
     if (!bridgeLeft || !bridgeRight) return;
-    diffSummaryText.textContent = '正在等待双端帧静止并回读 RGBA 像素…';
+    diffSummaryText.textContent = 'Waiting for both engines to settle before RGBA pixel readback…';
     await Promise.all([bridgeLeft.waitIdle(3500), bridgeRight.waitIdle(3500)]);
     const [snapA, snapB] = await Promise.all([bridgeLeft.readPixels(), bridgeRight.readPixels()]);
     if (!snapA || !snapB) {
-      diffSummaryText.textContent = '像素回读不可用（请确认两侧 WASM 引擎均已构建并就绪）';
+      diffSummaryText.textContent = 'Pixel readback unavailable (verify both WASM engine bundles are loaded)';
       return;
     }
     const w = Math.min(snapA.width, snapB.width);
@@ -433,7 +433,7 @@ async function main() {
     });
     ctx.putImageData(outImg, 0, 0);
     const pct = ((mismatched / (w * h)) * 100).toFixed(2);
-    diffSummaryText.textContent = `Pixel Diff (${w}×${h}px): ${mismatched.toLocaleString()} 差异像素 (${pct}%)`;
+    diffSummaryText.textContent = `Pixel Diff (${w}×${h}px): ${mismatched.toLocaleString()} mismatched pixels (${pct}%)`;
   };
 
   btnRefreshDiff.addEventListener('click', () => void computePixelDiff());

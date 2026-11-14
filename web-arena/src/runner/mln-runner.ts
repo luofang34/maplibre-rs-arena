@@ -51,13 +51,13 @@ export async function createMlnRunner(
   if (backend === 'webgpu' && !('gpu' in navigator)) {
     const unsupportedStatus: RunnerStatus = {
       state: 'unsupported',
-      message: '当前浏览器环境未开启 WebGPU (navigator.gpu 不存在)，可切换至 mln-rs (WebGL2) 或 Chrome/Edge WebGPU。',
+      message: 'WebGPU (navigator.gpu) is unavailable in this browser. Switch to mln-rs (WebGL2) or use a WebGPU-enabled browser.',
     };
     emitStatus(unsupportedStatus);
     return makeInertBridge(cfg, 'WebGPU Unsupported');
   }
 
-  emitStatus({ state: 'booting', message: `正在检测并编译 ${cfg.engineId} WASM 模块…` });
+  emitStatus({ state: 'booting', message: `Fetching & compiling ${cfg.engineId} WASM module…` });
 
   let wasmResp: Response;
   try {
@@ -66,14 +66,14 @@ export async function createMlnRunner(
     if (!wasmResp.ok || ct.includes('text/html')) {
       emitStatus({
         state: 'missing-wasm',
-        message: '尚未检测到本地编译的 mln-rs WASM 产物。请在仓库根目录执行 `just build-wasm` 或通过 GitHub Actions 自动构建。',
+        message: 'mln-rs WASM artifacts not found. Run `just build-wasm` locally or trigger the GitHub Actions workflow.',
       });
       return makeInertBridge(cfg, 'WASM Not Built');
     }
   } catch (err) {
     emitStatus({
       state: 'missing-wasm',
-      message: `无法加载 ${wasmRel}: ${String(err)}`,
+      message: `Failed to fetch ${wasmRel}: ${String(err)}`,
     });
     return makeInertBridge(cfg, 'WASM Missing');
   }
@@ -174,7 +174,6 @@ export async function createMlnRunner(
       case 'frame': {
         if (!telemetryEnabled || !telemetryCb) break;
         const p = data.sample.phases;
-        // PHASES = ['map', 'tiles', 'sources', 'symbols', 'layers', 'upload', 'draw', 'tasks']
         const mapMs = p[0] ?? 0;
         const tilesMs = p[1] ?? 0;
         const sourcesMs = p[2] ?? 0;
@@ -223,7 +222,7 @@ export async function createMlnRunner(
 
   const offscreen = canvas.transferControlToOffscreen();
   const resolvedStyleUrl = new URL(cfg.styleUrl, location.origin).href;
-  emitStatus({ state: 'loading', message: '正在加载样式与矢量瓦片…' });
+  emitStatus({ state: 'loading', message: 'Loading style and vector tiles…' });
 
   postToMap(
     {
@@ -247,7 +246,6 @@ export async function createMlnRunner(
     postToMap({ type: 'debug', on: true });
   }
 
-  // Wire canvas gestures identically to mln-rs examples/web/web/main.ts
   let rect = canvas.getBoundingClientRect();
   const evtTime = (e: Event) => performance.timeOrigin + e.timeStamp;
   const evtMods = (e: MouseEvent | KeyboardEvent) =>

@@ -157,9 +157,9 @@ fn run_matrix_cmd(args: &[String]) -> Result<(), String> {
             render_tests_mln_pass_pct: 94.2,
             expression_tests_mln_pass_pct: 98.1,
             terrain3d_conformance:
-                "maplibre-rs-experimental 支持 Terrarium/Mapbox DEM + Draping；mln-rs 未实现".into(),
+                "maplibre-rs-experimental supports Terrarium/Mapbox DEM + Draping; unimplemented in mln-rs".into(),
             xr_stereo_conformance:
-                "maplibre-rs-experimental 支持双目非对称视锥体 + StereoReuse；mln-rs 未实现".into(),
+                "maplibre-rs-experimental supports dual-eye asymmetric frusta + StereoReuse; unimplemented in mln-rs".into(),
         },
         solo_web_runs: Vec::new(),
     };

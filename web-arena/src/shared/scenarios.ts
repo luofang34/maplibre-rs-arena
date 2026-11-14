@@ -30,9 +30,10 @@ export const SCENARIOS: ScenarioSpec[] = [
   {
     id: 's1-urban-2d',
     code: 'S1',
-    title: 'S1 · 2D 高密城市路网与 POI (Amsterdam)',
+    title: 'S1 · 2D Dense Urban Vector & POI (Amsterdam)',
     category: '2D Vector',
-    description: 'OpenFreeMap Liberty 标准城市高密矢量瓦片缩放与平移，检验瓦片解码吞吐与符号避让稳态帧耗时。',
+    description:
+      'OpenFreeMap Liberty dense urban vector tile zoom & pan sweep, evaluating MVT decoding throughput and steady-state symbol collision timing.',
     styleUrl: 'https://tiles.openfreemap.org/styles/liberty',
     initialCamera: { lng: 4.8952, lat: 52.3702, zoom: 14.2, bearing: 0, pitch: 0 },
     durationMs: 7000,
@@ -50,13 +51,14 @@ export const SCENARIOS: ScenarioSpec[] = [
   {
     id: 's2-cjk-shaping',
     code: 'S2',
-    title: 'S2 · CJK 多语种文字排版与碰撞 (Tokyo)',
+    title: 'S2 · CJK & Multilingual Label Shaping (Tokyo)',
     category: 'Text & CJK',
-    description: '高密度中日韩与多脚本混排标注，直接对比 mln-rs HarfRust/本地 CJK 光栅化与 maplibre-rs-experimental 符号管线。',
+    description:
+      'High-density CJK + Latin mixed scripts in central Tokyo, comparing mln-rs HarfRust/local CJK rasterization against maplibre-rs-experimental remote PBF glyph stacks.',
     styleUrl: 'https://tiles.openfreemap.org/styles/bright',
     initialCamera: { lng: 139.7671, lat: 35.6812, zoom: 14.6, bearing: 0, pitch: 20 },
-    expCapabilityNote: '使用远程 PBF 字形栈与碰撞检测；暂未内置 HarfRust RTL 复杂连字塑形',
-    mlnCapabilityNote: '内置 mln_web_shaper (HarfRust + skrifa) 与 localIdeographFontFamily 本地 CJK 生成',
+    expCapabilityNote: 'Remote PBF glyph ranges + collision detection; no HarfRust RTL shaping yet',
+    mlnCapabilityNote: 'On-demand mln_web_shaper (HarfRust + skrifa) + localIdeographFontFamily CJK SDF',
     durationMs: 7000,
     targetBudgetMs: 16.67,
     flightPoseAt: (t) =>
@@ -72,9 +74,10 @@ export const SCENARIOS: ScenarioSpec[] = [
   {
     id: 's3-extrusion-3d',
     code: 'S3',
-    title: 'S3 · 3D 建筑挤压大倾角环绕 (Manhattan 65°)',
+    title: 'S3 · 3D Fill-Extrusion High-Pitch Orbit (Manhattan 64°)',
     category: '3D Extrusion',
-    description: '曼哈顿密集 fill-extrusion 建筑群 65° 大倾角 360° 环绕，评估深度排序、半透明混合、Draw Calls 与远近裁剪面精度。',
+    description:
+      '360° orbit over Lower & Midtown Manhattan dense fill-extrusion skyscrapers at 64° pitch, stressing depth sorting, draw calls, and near/far clip planes.',
     styleUrl: 'https://tiles.openfreemap.org/styles/liberty',
     initialCamera: { lng: -74.009, lat: 40.7082, zoom: 15.9, bearing: -36, pitch: 64 },
     durationMs: 8000,
@@ -90,9 +93,10 @@ export const SCENARIOS: ScenarioSpec[] = [
   {
     id: 's4-globe-polar',
     code: 'S4',
-    title: 'S4 · Globe 球面太空俯冲与跨极地旋转',
+    title: 'S4 · Globe Space-to-Street Dive & Polar Pan',
     category: 'Globe',
-    description: '验证 projection: globe 球面网格细分、大气边缘过渡、太空到街道（z=1.6 → z=13.5）无缝变焦及跨极点自由航向。',
+    description:
+      'Evaluates projection: globe mesh subdivision, atmosphere horizon blend, seamless space-to-street zoom (z=1.8 → z=12.8), and polar free-bearing.',
     styleUrl: '/styles/s4-globe.json',
     initialCamera: { lng: 11.25, lat: 38.5, zoom: 2.1, bearing: 0, pitch: 18 },
     globeFreeBearing: true,
@@ -111,13 +115,14 @@ export const SCENARIOS: ScenarioSpec[] = [
   {
     id: 's5-terrain-3d',
     code: 'S5',
-    title: 'S5 · 3D DEM 地形起伏与矢量贴地 Draping (Alps)',
+    title: 'S5 · 3D DEM Terrain Mesh & Vector Draping (Swiss/Austrian Alps)',
     category: '3D Terrain',
-    description: '核心决胜场景：AWS Terrarium 高程网格 + 道路/水系/建筑 3D 贴地（DrapeCache）+ 山体阴影大倾角穿越阿尔卑斯山谷。',
+    description:
+      'Core differentiator: AWS Terrarium 3D elevation mesh + draped roads/water/buildings (DrapeCache) + hillshade through Alpine valleys at 66° pitch.',
     styleUrl: '/styles/s5-terrain-3d.json',
     initialCamera: { lng: 11.392, lat: 47.269, zoom: 12.7, bearing: 142, pitch: 66 },
-    expCapabilityNote: '原生支持 3D DEM 网格高程起伏、矢量贴地 DrapeCache 及相机高程防穿模',
-    mlnCapabilityNote: '当前仅支持 2D hillshade/color-relief，不支持 style.terrain 3D 高程网格（画面呈平面）',
+    expCapabilityNote: 'Full 3D DEM terrain mesh + vector DrapeCache + camera ground-clamp',
+    mlnCapabilityNote: '2D hillshade only (style.terrain 3D elevation mesh not implemented)',
     durationMs: 8500,
     targetBudgetMs: 16.67,
     flightPoseAt: (t) =>
@@ -133,9 +138,10 @@ export const SCENARIOS: ScenarioSpec[] = [
   {
     id: 's6-dynamic-stress',
     code: 'S6',
-    title: 'S6 · 高频动态 GeoJSON / 表达式压测 (1,000 节点)',
+    title: 'S6 · Dynamic GeoJSON & Expression Stress (900 Live Nodes)',
     category: 'Dynamic Data',
-    description: '每帧动态驱动密集城市传感器脉冲点集与相机巡航，评测增量数据更新与插值表达式在连续帧下的 P99 抖动。',
+    description:
+      'Continuously mutates a 900-node urban sensor grid while orbiting San Francisco, measuring P95/P99 frame jitter under live data-driven expressions.',
     styleUrl: '/styles/s6-feature-state.json',
     initialCamera: { lng: -122.4194, lat: 37.7749, zoom: 13.6, bearing: 24, pitch: 48 },
     dynamicGeoJsonStress: true,
@@ -152,14 +158,15 @@ export const SCENARIOS: ScenarioSpec[] = [
   {
     id: 's7-xr-stereo',
     code: 'S7',
-    title: 'S7 · XR / WebXR 双目立体视口 90Hz 预算压测',
+    title: 'S7 · XR / WebXR Dual-Eye Stereo 90Hz Budget Simulator',
     category: 'XR Stereo',
-    description: '模拟头显左/右眼双视口视差（IPD 偏移 + 6DoF 头部微动），以 90Hz (11.11ms) 帧预算检验双目立体渲染与眩晕掉帧率。',
+    description:
+      'Simulates left/right HMD stereo IPD parallax + 6DoF head micro-motion over 3D Alpine terrain against a strict 90Hz (11.11ms) VR/XR frame budget.',
     styleUrl: '/styles/s5-terrain-3d.json',
     initialCamera: { lng: 7.6586, lat: 45.9763, zoom: 13.1, bearing: -28, pitch: 65 },
     stereoIpdSimulation: true,
-    expCapabilityNote: 'Native 具备 HeadlessMap::run_xr_frame + CoveringPolicy::StereoReuse 双目瓦片复用与 visionOS 工程',
-    mlnCapabilityNote: '无原生 XR 多视图立体管线；Web 端退化为双实例独立渲染',
+    expCapabilityNote: 'Native HeadlessMap::run_xr_frame + CoveringPolicy::StereoReuse + visionOS target',
+    mlnCapabilityNote: 'No native XR multi-view stereo pipeline; Web requires dual independent instances',
     durationMs: 7500,
     targetBudgetMs: 11.11,
     flightPoseAt: (t) => ({
@@ -173,9 +180,10 @@ export const SCENARIOS: ScenarioSpec[] = [
   {
     id: 's8-memory-tour',
     code: 'S8',
-    title: 'S8 · 跨洲长航程瓦片淘汰与内存水位审计',
+    title: 'S8 · Cross-Continent Tile Eviction & Memory Watermark Tour',
     category: 'Memory Stress',
-    description: '连续跨越伦敦 → 苏黎世 → 新加坡三座高密城市大跨度跳跃，追踪 WASM 线性内存与 GPU 显存峰值及瓦片缓存回收行为。',
+    description:
+      'Rapid long-haul hops across London → Zurich → Singapore to audit WASM linear memory growth, GPU buffer/texture watermarks, and tile cache eviction.',
     styleUrl: 'https://tiles.openfreemap.org/styles/liberty',
     initialCamera: { lng: -0.1276, lat: 51.5072, zoom: 14.4, bearing: 0, pitch: 45 },
     durationMs: 9000,

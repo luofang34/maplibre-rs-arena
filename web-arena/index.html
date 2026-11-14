@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>maplibre-rs-arena · Rust 渲染内核全平台对比与基准工作台</title>
+    <title>maplibre-rs-arena · Rust Map Rendering Comparison &amp; Benchmark Workbench</title>
     <link rel="stylesheet" href="/src/styles/main.css" />
   </head>
   <body>
@@ -13,11 +13,11 @@
         <span class="brand-name">maplibre-rs-arena</span>
       </div>
 
-      <div role="toolbar" focusgroup="toolbar wrap" aria-label="引擎对比与基准评测控制栏" class="arena-toolbar">
-        <div role="group" aria-label="引擎与场景选择" class="toolbar-select-group">
+      <div role="toolbar" focusgroup="toolbar wrap" aria-label="Engine comparison and benchmark controls" class="arena-toolbar">
+        <div role="group" aria-label="Engine and scenario selection" class="toolbar-select-group">
           <label class="select-pill">
             <span class="slot-tag slot-a">A</span>
-            <select id="select-left" aria-label="左栏引擎 (Engine A)">
+            <select id="select-left" aria-label="Left pane engine (Engine A)">
               <option value="exp-mt">exp-rs (WebGPU MT)</option>
               <option value="exp-st">exp-rs (WebGPU ST)</option>
               <option value="mln-webgpu">mln-rs (WebGPU)</option>
@@ -26,11 +26,11 @@
             </select>
           </label>
 
-          <button type="button" id="btn-swap-engines" class="tb-btn" title="交换左右引擎 (X)">⇄</button>
+          <button type="button" id="btn-swap-engines" class="tb-btn" title="Swap Left &amp; Right engines (X)">⇄</button>
 
           <label class="select-pill">
             <span class="slot-tag slot-b">B</span>
-            <select id="select-right" aria-label="右栏引擎 (Engine B)">
+            <select id="select-right" aria-label="Right pane engine (Engine B)">
               <option value="mln-webgpu" selected>mln-rs (WebGPU)</option>
               <option value="mln-webgl2">mln-rs (WebGL2)</option>
               <option value="exp-mt">exp-rs (WebGPU MT)</option>
@@ -40,34 +40,34 @@
           </label>
 
           <label class="select-pill scenario-pill">
-            <span class="slot-tag">场景</span>
-            <select id="select-scenario" aria-label="评测场景 (S1–S8)"></select>
+            <span class="slot-tag">Scene</span>
+            <select id="select-scenario" aria-label="Benchmark scenario (S1–S8)"></select>
           </label>
         </div>
 
         <div role="separator" aria-orientation="vertical"></div>
 
-        <div role="group" aria-label="对比视图模式">
-          <button type="button" class="tb-btn" data-view-mode="curtain" aria-pressed="true">卷帘 Curtain</button>
-          <button type="button" class="tb-btn" data-view-mode="side-by-side" aria-pressed="false">并排 Dual</button>
-          <button type="button" class="tb-btn" data-view-mode="blink" aria-pressed="false" title="按空格键瞬切 A/B">瞬切 Blink</button>
-          <button type="button" class="tb-btn" data-view-mode="diff" aria-pressed="false">差分 Diff</button>
+        <div role="group" aria-label="Comparison view mode">
+          <button type="button" class="tb-btn" data-view-mode="curtain" aria-pressed="true">Curtain</button>
+          <button type="button" class="tb-btn" data-view-mode="side-by-side" aria-pressed="false">Side-by-Side</button>
+          <button type="button" class="tb-btn" data-view-mode="blink" aria-pressed="false" title="Press Space to blink A/B">Blink</button>
+          <button type="button" class="tb-btn" data-view-mode="diff" aria-pressed="false">Pixel Diff</button>
         </div>
 
         <div role="separator" aria-orientation="vertical"></div>
 
-        <div role="group" aria-label="遥测与跑分工具">
-          <button type="button" id="btn-toggle-perf" class="tb-btn" aria-pressed="false" title="开启/关闭零开销帧拆解面板 (快捷键 D)">
-            性能 HUD (D)
+        <div role="group" aria-label="Telemetry and benchmark tools">
+          <button type="button" id="btn-toggle-perf" class="tb-btn" aria-pressed="false" title="Toggle zero-overhead frame telemetry HUD (D)">
+            Perf HUD (D)
           </button>
           <button type="button" id="btn-solo-flight" class="tb-btn tb-accent">
-            ▶ Solo 航线跑分
+            ▶ Solo Flight
           </button>
           <button type="button" class="tb-btn" commandfor="matrix-dialog" command="show-modal">
-            统计矩阵看板
+            Matrix Report
           </button>
           <button type="button" class="tb-btn" commandfor="scenario-popover" command="toggle-popover">
-            场景说明
+            Scene Info
           </button>
         </div>
       </div>
@@ -75,7 +75,7 @@
 
     <main id="viewport-stage" class="viewport-stage" data-mode="curtain" style="--split: 50%">
       <div id="pane-left" class="map-pane pane-left">
-        <iframe id="frame-left" title="左栏渲染视口 (Engine A)" src="about:blank"></iframe>
+        <iframe id="frame-left" title="Left rendering viewport (Engine A)" src="about:blank"></iframe>
         <div class="pane-corner-badge badge-left">
           <span class="slot-tag slot-a">A</span>
           <span id="badge-left-name">exp-rs</span>
@@ -84,7 +84,7 @@
       </div>
 
       <div id="pane-right" class="map-pane pane-right">
-        <iframe id="frame-right" title="右栏渲染视口 (Engine B)" src="about:blank"></iframe>
+        <iframe id="frame-right" title="Right rendering viewport (Engine B)" src="about:blank"></iframe>
         <div class="pane-corner-badge badge-right">
           <span class="slot-tag slot-b">B</span>
           <span id="badge-right-name">mln-rs</span>
@@ -94,8 +94,8 @@
 
       <canvas id="diff-canvas" class="diff-canvas" hidden></canvas>
       <div id="diff-summary-pill" class="diff-summary-pill" hidden>
-        <span id="diff-summary-text">正在采样双端像素缓冲…</span>
-        <button type="button" id="btn-refresh-diff" class="tb-btn">重新采样对比</button>
+        <span id="diff-summary-text">Sampling RGBA framebuffers…</span>
+        <button type="button" id="btn-refresh-diff" class="tb-btn">Resample Diff</button>
       </div>
 
       <div
@@ -103,7 +103,7 @@
         class="curtain-divider"
         role="slider"
         tabindex="0"
-        aria-label="左右引擎卷帘分割线"
+        aria-label="Curtain split divider"
         aria-valuemin="5"
         aria-valuemax="95"
         aria-valuenow="50"
@@ -111,11 +111,11 @@
         <div class="divider-handle" aria-hidden="true">⇔</div>
       </div>
 
-      <aside id="perf-hud" class="perf-hud" hidden aria-label="双引擎归一化帧拆解遥测面板">
+      <aside id="perf-hud" class="perf-hud" hidden aria-label="Normalized dual-engine frame telemetry HUD">
         <header class="perf-hud-header">
           <div>
-            <strong>跨引擎 5 桶归一化遥测</strong>
-            <span class="hud-sub">悬停条形图查看引擎原生阶段明细</span>
+            <strong>5-Bucket Normalized Frame Telemetry</strong>
+            <span class="hud-sub">Hover bucket bars to inspect native engine stages</span>
           </div>
           <span id="hud-camera-readout" class="hud-cam">z14.20 · 52.3702, 4.8952</span>
         </header>
@@ -125,34 +125,34 @@
 
       <div id="solo-progress-toast" class="solo-progress-toast" hidden role="status" aria-live="polite">
         <span class="pulse-dot" aria-hidden="true"></span>
-        <span id="solo-progress-text">正在准备独占航线基准…</span>
+        <span id="solo-progress-text">Preparing solo flight benchmark…</span>
       </div>
     </main>
 
     <div id="scenario-popover" popover class="info-popover">
       <div class="popover-head">
-        <strong id="pop-scenario-title">场景详情</strong>
-        <button type="button" class="tb-btn" commandfor="scenario-popover" command="close">关闭</button>
+        <strong id="pop-scenario-title">Scenario Details</strong>
+        <button type="button" class="tb-btn" commandfor="scenario-popover" command="close">Close</button>
       </div>
       <p id="pop-scenario-desc" class="popover-desc"></p>
       <ul class="shortcut-list">
-        <li><kbd>拖动分割条 / ← →</kbd>：卷帘实时对比渲染细节</li>
-        <li><kbd>Space</kbd>（Blink 模式）：全屏零位移瞬切 A / B</li>
-        <li><kbd>D</kbd>：按需挂载/卸载双端帧拆解遥测（默认关闭零开销）</li>
-        <li><kbd>X</kbd>：一键互换左/右引擎槽位</li>
+        <li><kbd>Drag Divider / ← →</kbd>: Swipe curtain to compare rendering details</li>
+        <li><kbd>Space</kbd> (Blink mode): Instant full-viewport A / B swap</li>
+        <li><kbd>D</kbd>: Toggle frame breakdown HUD (zero overhead when closed)</li>
+        <li><kbd>X</kbd>: Swap Left / Right engine slots</li>
       </ul>
     </div>
 
     <dialog id="matrix-dialog" closedby="any" aria-labelledby="matrix-dialog-title" class="matrix-dialog">
       <header class="dialog-header">
         <div>
-          <h2 id="matrix-dialog-title">MapLibre Rust 双引擎统计矩阵与全平台决策看板</h2>
-          <p class="dialog-subtitle">涵盖 Web Solo 跑分、Native Headless ABBA 显著性检验、3D 地形贴地与 XR/WebXR 立体管线审计</p>
+          <h2 id="matrix-dialog-title">MapLibre Rust Engines — Statistical Matrix &amp; Decision Scorecard</h2>
+          <p class="dialog-subtitle">Web Solo Flight runs, Native Headless ABBA significance tests, 3D Terrain draping &amp; XR/WebXR stereo audit</p>
         </div>
         <div class="dialog-actions">
-          <button type="button" id="btn-export-json" class="tb-btn">导出 JSON</button>
-          <button type="button" id="btn-export-md" class="tb-btn">导出 Markdown</button>
-          <button type="button" class="tb-btn" commandfor="matrix-dialog" command="close">关闭 (Esc)</button>
+          <button type="button" id="btn-export-json" class="tb-btn">Export JSON</button>
+          <button type="button" id="btn-export-md" class="tb-btn">Export Markdown</button>
+          <button type="button" class="tb-btn" commandfor="matrix-dialog" command="close">Close (Esc)</button>
         </div>
       </header>
       <div id="matrix-dialog-body" class="dialog-body"></div>

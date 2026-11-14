@@ -44,12 +44,12 @@ async function boot() {
     }
     banner.hidden = false;
     const titles: Record<RunnerStatus['state'], string> = {
-      booting: '正在准备渲染内核…',
-      loading: '正在加载样式与瓦片…',
+      booting: 'Preparing rendering engine…',
+      loading: 'Loading style and vector tiles…',
       ready: '',
-      'missing-wasm': `${cfg.engineId} WASM 产物尚未构建`,
-      unsupported: `${cfg.engineId} 当前环境不支持`,
-      error: `${cfg.engineId} 运行异常`,
+      'missing-wasm': `${cfg.engineId} WASM bundle not built`,
+      unsupported: `${cfg.engineId} unsupported in this browser`,
+      error: `${cfg.engineId} runtime error`,
     };
     bannerTitle.textContent = titles[status.state];
     bannerDesc.textContent = status.message;

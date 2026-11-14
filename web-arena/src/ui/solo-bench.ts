@@ -33,7 +33,7 @@ export async function executeSoloFlightPair(
   host.unmountSlot('right');
 
   const runOne = async (slot: 'left' | 'right', engineId: EngineId): Promise<SoloRunMetrics> => {
-    host.onProgress(`正在独立挂载 ${engineId} (${scenario.code}) 并等待首屏瓦片就绪…`);
+    host.onProgress(`Mounting ${engineId} (${scenario.code}) in isolated slot and waiting for initial tiles…`);
     const bootT0 = performance.now();
     const bridge = await host.mountSingleSlot(slot, engineId, scenario, true);
     const readyInfo = await Promise.race([
@@ -48,7 +48,7 @@ export async function executeSoloFlightPair(
     });
     bridge.setTelemetryEnabled(true);
 
-    host.onProgress(`正在执行 ${engineId} 独占确定性航线压测 (${(scenario.durationMs / 1000).toFixed(1)}s)…`);
+    host.onProgress(`Running deterministic solo flight on ${engineId} (${(scenario.durationMs / 1000).toFixed(1)}s)…`);
     const startFlight = performance.now();
     let tick = 0;
 

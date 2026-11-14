@@ -6,7 +6,7 @@ function statusBadge(status: CapabilityRow['expStatus']): string {
 }
 
 function fmtBytesKiB(bytes: number | undefined): string {
-  if (!bytes) return '未构建';
+  if (!bytes) return 'Not built';
   return `${(bytes / 1024).toFixed(1)} KiB`;
 }
 
@@ -30,7 +30,7 @@ export function renderMatrixDialogBody(
             </tr>`;
         })
         .join('')
-    : `<tr><th scope="row">WASM 产物包体</th><td class="num">—</td><td class="num">—</td><td>执行 <code>just build-wasm</code> 后自动生成包体统计</td></tr>`;
+    : `<tr><th scope="row">WASM Bundles</th><td class="num">—</td><td class="num">—</td><td>Run <code>just build-wasm</code> to generate bundle size telemetry</td></tr>`;
 
   const soloRowsHtml =
     allSolo.length > 0
@@ -50,7 +50,7 @@ export function renderMatrixDialogBody(
               </tr>`;
           })
           .join('')
-      : `<tr><th scope="row">暂无当前会话跑分</th><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>`;
+      : `<tr><th scope="row">No solo runs recorded in this session yet</th><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>`;
 
   const nativeRowsHtml = report.nativeAbba
     .map(
@@ -59,7 +59,7 @@ export function renderMatrixDialogBody(
         <th scope="row">${row.scenario}</th>
         <td>${row.workload}</td>
         <td class="num">${row.expMedianMs > 0 ? `${row.expMedianMs.toFixed(2)} ms` : '—'}</td>
-        <td class="num">${row.mlnMedianMs > 0 ? `${row.mlnMedianMs.toFixed(2)} ms` : '不支持'}</td>
+        <td class="num">${row.mlnMedianMs > 0 ? `${row.mlnMedianMs.toFixed(2)} ms` : 'Unsupported'}</td>
         <td class="num">${row.mlnMedianMs > 0 ? `p=${row.mannWhitneyP.toFixed(3)}` : '—'}</td>
         <td class="num">${row.expPeakRssMiB ? `${row.expPeakRssMiB.toFixed(0)} MiB` : '—'} / ${row.mlnPeakRssMiB ? `${row.mlnPeakRssMiB.toFixed(0)} MiB` : '—'}</td>
         <td><strong>${row.verdict}</strong> · <span class="muted">${row.notes}</span></td>
@@ -84,71 +84,71 @@ export function renderMatrixDialogBody(
     <div class="matrix-meta-strip">
       <div><span>maplibre-rs-experimental:</span> <code>${manifest?.commits.maplibreRsExperimental ?? report.commits.maplibreRsExperimental}</code></div>
       <div><span>mln-rs:</span> <code>${manifest?.commits.mlnRs ?? report.commits.mlnRs}</code></div>
-      <div><span>跨源隔离 (COOP/COEP):</span> <code>${window.crossOriginIsolated ? '已启用 (SharedArrayBuffer 可用)' : '未启用'}</code></div>
+      <div><span>Cross-Origin Isolation (COOP/COEP):</span> <code>${window.crossOriginIsolated ? 'Enabled (SharedArrayBuffer active)' : 'Disabled'}</code></div>
     </div>
 
-    <h3 id="tbl-cap-heading" class="matrix-section-title">1. 全平台能力矩阵（Web · Desktop · Mobile · 3D Terrain · Native XR / WebXR）</h3>
+    <h3 id="tbl-cap-heading" class="matrix-section-title">1. Cross-Platform Capability Matrix (Web · Desktop · Mobile · 3D Terrain · Native XR / WebXR)</h3>
     <div tabindex="0" role="region" aria-labelledby="tbl-cap-heading" class="table-wrapper">
-      <table class="arena-table" style="--label-1:'领域';--label-2:'maplibre-rs-experimental';--label-3:'mln-rs';--label-4:'GL JS 基线'">
+      <table class="arena-table" style="--label-1:'Domain';--label-2:'maplibre-rs-experimental';--label-3:'mln-rs';--label-4:'GL JS Baseline'">
         <thead>
           <tr>
-            <th scope="col">核心维度</th>
-            <th scope="col">所属域</th>
+            <th scope="col">Capability Dimension</th>
+            <th scope="col">Domain</th>
             <th scope="col">maplibre-rs-experimental</th>
             <th scope="col">mln-rs</th>
-            <th scope="col">MapLibre GL JS 基线</th>
+            <th scope="col">MapLibre GL JS Baseline</th>
           </tr>
         </thead>
         <tbody>${capRowsHtml}</tbody>
       </table>
     </div>
 
-    <h3 id="tbl-solo-heading" class="matrix-section-title">2. Web 端 Solo 独占航线跑分（零同页 GPU 争用）</h3>
+    <h3 id="tbl-solo-heading" class="matrix-section-title">2. Web Solo Automated Flight Benchmarks (Zero Co-Tenant GPU Contention)</h3>
     <div tabindex="0" role="region" aria-labelledby="tbl-solo-heading" class="table-wrapper">
-      <table class="arena-table" style="--label-1:'首屏耗时';--label-2:'CPU Avg';--label-3:'CPU P95';--label-4:'CPU P99';--label-5:'90Hz 超预算率';--label-6:'峰值 WASM';--label-7:'平均 Draw Calls'">
+      <table class="arena-table" style="--label-1:'Cold Load';--label-2:'CPU Avg';--label-3:'CPU P95';--label-4:'CPU P99';--label-5:'90Hz Miss %';--label-6:'Peak WASM';--label-7:'Avg Draw Calls'">
         <thead>
           <tr>
-            <th scope="col">场景与引擎</th>
-            <th scope="col" class="num">首屏冷加载</th>
+            <th scope="col">Scenario &amp; Engine</th>
+            <th scope="col" class="num">Cold Load</th>
             <th scope="col" class="num">CPU Avg</th>
             <th scope="col" class="num">CPU P95</th>
             <th scope="col" class="num">CPU P99</th>
-            <th scope="col" class="num">90Hz XR 掉帧率</th>
-            <th scope="col" class="num">峰值 WASM 内存</th>
-            <th scope="col" class="num">平均 Draw Calls</th>
+            <th scope="col" class="num">90Hz XR Miss %</th>
+            <th scope="col" class="num">Peak WASM Mem</th>
+            <th scope="col" class="num">Avg Draw Calls</th>
           </tr>
         </thead>
         <tbody>${soloRowsHtml}</tbody>
       </table>
     </div>
 
-    <h3 id="tbl-native-heading" class="matrix-section-title">3. Native Headless ABBA 交错基准与 XR 双目压测</h3>
+    <h3 id="tbl-native-heading" class="matrix-section-title">3. Native Headless ABBA Interleaved Benchmarks &amp; Stereo XR Stress</h3>
     <div tabindex="0" role="region" aria-labelledby="tbl-native-heading" class="table-wrapper">
-      <table class="arena-table" style="--label-1:'负载';--label-2:'exp-rs 中位数';--label-3:'mln-rs 中位数';--label-4:'Mann-Whitney';--label-5:'峰值 RSS (exp/mln)';--label-6:'结论与说明'">
+      <table class="arena-table" style="--label-1:'Workload';--label-2:'exp-rs Median';--label-3:'mln-rs Median';--label-4:'Mann-Whitney';--label-5:'Peak RSS (exp/mln)';--label-6:'Verdict & Notes'">
         <thead>
           <tr>
-            <th scope="col">评测场景</th>
-            <th scope="col">负载类型</th>
+            <th scope="col">Scenario</th>
+            <th scope="col">Workload</th>
             <th scope="col" class="num">exp-rs Median</th>
             <th scope="col" class="num">mln-rs Median</th>
-            <th scope="col" class="num">显著性检验</th>
+            <th scope="col" class="num">Significance</th>
             <th scope="col" class="num">Peak RSS (exp / mln)</th>
-            <th scope="col">统计判定与架构备注</th>
+            <th scope="col">Verdict &amp; Architectural Notes</th>
           </tr>
         </thead>
         <tbody>${nativeRowsHtml}</tbody>
       </table>
     </div>
 
-    <h3 id="tbl-wasm-heading" class="matrix-section-title">4. WASM 产物包体审计（Raw vs Gzip-9）</h3>
+    <h3 id="tbl-wasm-heading" class="matrix-section-title">4. WASM Binary Bundle Size Audit (Raw vs Gzip-9)</h3>
     <div tabindex="0" role="region" aria-labelledby="tbl-wasm-heading" class="table-wrapper">
-      <table class="arena-table" style="--label-1:'Raw 体积';--label-2:'Gzip-9 体积';--label-3:'产物路径'">
+      <table class="arena-table" style="--label-1:'Raw Size';--label-2:'Gzip-9 Size';--label-3:'Asset Path'">
         <thead>
           <tr>
-            <th scope="col">构建目标</th>
-            <th scope="col" class="num">Raw 大小</th>
-            <th scope="col" class="num">Gzip -9 大小</th>
-            <th scope="col">静态路径</th>
+            <th scope="col">Bundle Target</th>
+            <th scope="col" class="num">Raw Size</th>
+            <th scope="col" class="num">Gzip -9 Size</th>
+            <th scope="col">Static Asset Path</th>
           </tr>
         </thead>
         <tbody>${wasmRowsHtml}</tbody>

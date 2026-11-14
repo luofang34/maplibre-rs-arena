@@ -9,11 +9,11 @@ interface SlotHistory {
 }
 
 const BUCKET_META: Array<{ key: keyof CanonicalBuckets; label: string; color: string }> = [
-  { key: 'inputSetupMs', label: 'B1 输入与相机', color: '#94a3b8' },
-  { key: 'tileIngestMs', label: 'B2 瓦片与解码', color: '#38bdf8' },
-  { key: 'symbolPlacementMs', label: 'B3 文字与避让', color: '#facc15' },
-  { key: 'terrainDrapeUploadMs', label: 'B4 地形贴地/上传', color: '#a855f7' },
-  { key: 'renderSubmitMs', label: 'B5 编码与绘制', color: '#34d399' },
+  { key: 'inputSetupMs', label: 'B1 Input & Camera', color: '#94a3b8' },
+  { key: 'tileIngestMs', label: 'B2 Tiles & Decode', color: '#38bdf8' },
+  { key: 'symbolPlacementMs', label: 'B3 Text & Symbols', color: '#facc15' },
+  { key: 'terrainDrapeUploadMs', label: 'B4 Terrain & Upload', color: '#a855f7' },
+  { key: 'renderSubmitMs', label: 'B5 Encode & Submit', color: '#34d399' },
 ];
 
 function percentile(sorted: number[], p: number): number {
@@ -82,8 +82,8 @@ export class ArenaPerfHud {
   private render(): void {
     if (!this.enabled) return;
     this.drawSparkline();
-    const leftHtml = this.renderSlotColumn('A (左栏)', '#38bdf8', this.left);
-    const rightHtml = this.renderSlotColumn('B (右栏)', '#f472b6', this.right);
+    const leftHtml = this.renderSlotColumn('A (Left)', '#38bdf8', this.left);
+    const rightHtml = this.renderSlotColumn('B (Right)', '#f472b6', this.right);
     this.bodyEl.innerHTML = `<div class="hud-columns">${leftHtml}${rightHtml}</div>`;
   }
 
@@ -146,7 +146,7 @@ export class ArenaPerfHud {
           <header class="hud-col-head">
             <span class="hud-dot" style="background:${accent}"></span>
             <strong>${slotTitle}</strong>
-            <span class="hud-badge">等待帧采样…</span>
+            <span class="hud-badge">Waiting for frames…</span>
           </header>
         </section>`;
     }
