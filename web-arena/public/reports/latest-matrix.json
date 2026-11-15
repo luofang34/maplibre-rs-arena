@@ -1,11 +1,11 @@
 {
-  "generatedAt": "2026-11-15T03:11:12Z",
+  "generatedAt": "2026-11-15T14:15:58Z",
   "commits": {
-    "maplibreRsExperimental": "03c4850efd",
+    "maplibreRsExperimental": "4068f5d463",
     "mlnRs": "0ca2ff95fb",
     "maplibreGlJs": "5.3.0"
   },
-  "hardwareProfile": "macos aarch64 (5 ABBA rounds)",
+  "hardwareProfile": "Static Capability Audit on macos aarch64 (pass `--live` to run local GPU ABBA rounds)",
   "capabilities": [
     {
       "dimension": "WebGPU Render Pipeline & Concurrency Model",
@@ -75,16 +75,16 @@
     {
       "scenario": "Live Native Headless Probe",
       "workload": "ABBA (5 rounds)",
-      "expMedianMs": 117.450417,
-      "mlnMedianMs": 6.657209,
-      "deltaPct": 1664.259121202294,
+      "expMedianMs": 114.288125,
+      "mlnMedianMs": 6.484895999999999,
+      "deltaPct": 1662.3740612031409,
       "mannWhitneyP": 0.0022023577164516084,
       "verdict": "mln-rs faster",
       "expMinstr": null,
       "mlnMinstr": null,
-      "expPeakRssMib": 103.90625,
-      "mlnPeakRssMib": 6.78125,
-      "notes": "CPU user+sys median: exp=175.3ms, mln=5.5ms (wait4 rusage)"
+      "expPeakRssMib": 105.703125,
+      "mlnPeakRssMib": 6.765625,
+      "notes": "CPU user+sys median: exp=173.6ms, mln=5.3ms (wait4 rusage)"
     }
   ],
   "conformanceSummary": {

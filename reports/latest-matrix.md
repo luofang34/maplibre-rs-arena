@@ -1,9 +1,9 @@
 # MapLibre Rust Arena — Latest Matrix Report
 
-- **Generated At**: `2026-11-15T03:11:12Z`
-- **`maplibre-rs-experimental` rev**: `03c4850efd`
+- **Generated At**: `2026-11-15T14:15:58Z`
+- **`maplibre-rs-experimental` rev**: `4068f5d463`
 - **`mln-rs` rev**: `0ca2ff95fb`
-- **Hardware Profile**: macos aarch64 (5 ABBA rounds)
+- **Hardware Profile**: Static Capability Audit on macos aarch64 (pass `--live` to run local GPU ABBA rounds)
 
 ## 1. Platform, 3D Terrain & XR Capability Matrix
 
@@ -21,4 +21,4 @@
 
 | Scenario | Workload | `exp-rs` Median (ms) | `mln-rs` Median (ms) | Mann-Whitney p | Verdict | Notes |
 | :--- | :--- | ---: | ---: | ---: | :--- | :--- |
-| Live Native Headless Probe | ABBA (5 rounds) | 117.45 | 6.66 | 0.002 | **mln-rs faster** | CPU user+sys median: exp=175.3ms, mln=5.5ms (wait4 rusage) |
+| Live Native Headless Probe | ABBA (5 rounds) | 114.29 | 6.48 | 0.002 | **mln-rs faster** | CPU user+sys median: exp=173.6ms, mln=5.3ms (wait4 rusage) |
