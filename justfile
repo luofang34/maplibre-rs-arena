@@ -1,6 +1,6 @@
 #!/usr/bin/env just --justfile
 
-set shell := ["bash", "-euo pipefail", "-c"]
+set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
 
 # Link local sibling checkouts ../maplibre-rs-experimental and ../mln-rs into engines/
 sync-local:
@@ -12,19 +12,27 @@ sync-remote EXP_REF="main" MLN_REF="main":
 
 # Build WASM bundles for mln-rs (WebGPU + WebGL2 + Shaper) and maplibre-rs-experimental (ST + MT with arena-telemetry)
 build-wasm PROFILE="release":
-    ./scripts/build-wasm-all.sh "{{PROFILE}}"
+    ./scripts/build-wasm-all.sh "{{PROFILE}}" all
+
+# Fast inner-loop: rebuild ONLY maplibre-rs-experimental WASM (ST + MT) while keeping mln-rs baseline cached
+build-wasm-exp PROFILE="release":
+    ./scripts/build-wasm-all.sh "{{PROFILE}}" exp
 
 # Install web-arena dependencies
 install-web:
     cd web-arena && npm install
 
-# Start local Vite dev server (with COOP: same-origin & COEP: credentialless)
+# Start local Vite dev server at http://127.0.0.1:5173 (with COOP: same-origin & COEP: credentialless, no CF Worker)
 dev:
-    cd web-arena && npm run dev
+    cd web-arena && npm run dev -- --host 127.0.0.1 --port 5173
 
 # Build production static bundle into web-arena/dist
 build-web:
     cd web-arena && npm run build
+
+# Serve production local workbench at http://127.0.0.1:4173 (with COOP/COEP headers, zero Cloudflare dependency)
+preview: build-web
+    cd web-arena && npm run preview -- --host 127.0.0.1 --port 4173
 
 # Deploy web-arena/dist to Cloudflare Workers Static Assets
 deploy: build-web

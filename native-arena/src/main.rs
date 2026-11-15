@@ -197,17 +197,19 @@ fn run_live_abba_probes(
         return Err("failed to build maplibre-demo --features headless".into());
     }
 
+    let mln_target_dir = std::env::temp_dir().join("mln-bench-target");
     let status_mln = Command::new("cargo")
         .current_dir(mln_dir)
-        .args(["build", "--release", "-p", "mln-bench"])
+        .env("CARGO_TARGET_DIR", &mln_target_dir)
+        .args(["build", "--release", "-p", "mln-rs-bench"])
         .status()
-        .map_err(|e| format!("cargo build mln-bench failed: {e}"))?;
+        .map_err(|e| format!("cargo build mln-rs-bench failed: {e}"))?;
     if !status_mln.success() {
-        return Err("failed to build mln-bench".into());
+        return Err("failed to build mln-rs-bench".into());
     }
 
     let exp_bin = exp_dir.join("target/release/maplibre-demo");
-    let mln_bin = mln_dir.join("target/release/mln-bench");
+    let mln_bin = mln_target_dir.join("release/mln-bench");
     let tmp_png = std::env::temp_dir().join("arena-exp-probe.png");
 
     let schedule = abba_schedule(rounds);

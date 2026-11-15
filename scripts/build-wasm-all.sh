@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROFILE="${1:-release}"
+ONLY="${2:-all}" # all | mln | exp
 
 if [[ ! -d "$ROOT/engines/maplibre-rs-experimental" || ! -d "$ROOT/engines/mln-rs" ]]; then
   if [[ -d "$ROOT/../maplibre-rs-experimental" && -d "$ROOT/../mln-rs" ]]; then
@@ -38,64 +39,69 @@ ensure_wasm_bindgen() {
   export PATH="$cache_bin:$PATH"
 }
 
-echo "=== [1/2] Building mln-rs WASM (unmodified upstream) ==="
-ensure_wasm_bindgen "$MLN_DIR/Cargo.toml"
-(
-  cd "$MLN_DIR"
-  if [[ "$PROFILE" == "release" ]]; then
-    export CARGO_PROFILE_RELEASE_OPT_LEVEL=s
-    CARGO_PROF="release"
-    TARGET_SUB="release"
-  else
-    CARGO_PROF="dev"
-    TARGET_SUB="debug"
-  fi
+if [[ "$ONLY" == "all" || "$ONLY" == "mln" ]]; then
+  echo "=== [1/2] Building mln-rs WASM (unmodified upstream) ==="
+  ensure_wasm_bindgen "$MLN_DIR/Cargo.toml"
+  (
+    cd "$MLN_DIR"
+    export CARGO_TARGET_DIR="${MLN_WASM_TARGET_DIR:-$ROOT/.cache/mln-wasm-target}"
+    if [[ "$PROFILE" == "release" ]]; then
+      export CARGO_PROFILE_RELEASE_OPT_LEVEL=s
+      CARGO_PROF="release"
+      TARGET_SUB="release"
+    else
+      CARGO_PROF="dev"
+      TARGET_SUB="debug"
+    fi
 
-  cargo build --profile "$CARGO_PROF" --target wasm32-unknown-unknown -p mln-rs-web -p mln-rs-web-shaper
-  wasm-bindgen --target web --out-dir "$OUT_DIR/mln/pkg" "target/wasm32-unknown-unknown/$TARGET_SUB/mln_web.wasm"
-  wasm-bindgen --target web --out-dir "$OUT_DIR/mln/pkg" "target/wasm32-unknown-unknown/$TARGET_SUB/mln_web_shaper.wasm"
+    cargo build --profile "$CARGO_PROF" --target wasm32-unknown-unknown -p mln-rs-web -p mln-rs-web-shaper
+    wasm-bindgen --target web --out-dir "$OUT_DIR/mln/pkg" "$CARGO_TARGET_DIR/wasm32-unknown-unknown/$TARGET_SUB/mln_web.wasm"
+    wasm-bindgen --target web --out-dir "$OUT_DIR/mln/pkg" "$CARGO_TARGET_DIR/wasm32-unknown-unknown/$TARGET_SUB/mln_web_shaper.wasm"
 
-  cargo build --profile "$CARGO_PROF" --target wasm32-unknown-unknown -p mln-rs-web --features webgl
-  wasm-bindgen --target web --out-dir "$OUT_DIR/mln/pkg/webgl" "target/wasm32-unknown-unknown/$TARGET_SUB/mln_web.wasm"
+    cargo build --profile "$CARGO_PROF" --target wasm32-unknown-unknown -p mln-rs-web --features webgl
+    wasm-bindgen --target web --out-dir "$OUT_DIR/mln/pkg/webgl" "$CARGO_TARGET_DIR/wasm32-unknown-unknown/$TARGET_SUB/mln_web.wasm"
 
-  if [[ "$PROFILE" == "release" ]] && command -v wasm-opt >/dev/null 2>&1; then
-    for w in "$OUT_DIR/mln/pkg/mln_web_bg.wasm" "$OUT_DIR/mln/pkg/mln_web_shaper_bg.wasm" "$OUT_DIR/mln/pkg/webgl/mln_web_bg.wasm"; do
-      wasm-opt -Oz --converge --one-caller-inline-max-function-size=20 --zero-filled-memory --low-memory-unused \
-        --strip-debug --strip-producers --strip-target-features "$w" -o "$w"
-    done
-  fi
-)
+    if [[ "$PROFILE" == "release" ]] && command -v wasm-opt >/dev/null 2>&1; then
+      for w in "$OUT_DIR/mln/pkg/mln_web_bg.wasm" "$OUT_DIR/mln/pkg/mln_web_shaper_bg.wasm" "$OUT_DIR/mln/pkg/webgl/mln_web_bg.wasm"; do
+        wasm-opt -Oz --converge --one-caller-inline-max-function-size=20 --zero-filled-memory --low-memory-unused \
+          --strip-debug --strip-producers --strip-target-features "$w" -o "$w"
+      done
+    fi
+  )
+fi
 
-echo "=== [2/2] Building maplibre-rs-experimental WASM (ST + MT with arena-telemetry) ==="
-ensure_wasm_bindgen "$EXP_DIR/Cargo.toml"
-(
-  cd "$EXP_DIR/web/lib"
-  npm ci --no-audit --no-fund || npm install --no-audit --no-fund
-  EXTRA_FLAGS="--esm"
-  if [[ "$PROFILE" == "release" ]]; then
-    EXTRA_FLAGS="--release $EXTRA_FLAGS"
-  fi
-  TELEMETRY_ENABLED="false"
-  if grep -q "arena-telemetry" build.mjs; then
-    EXTRA_FLAGS="$EXTRA_FLAGS --arena-telemetry"
-    TELEMETRY_ENABLED="true"
-  else
-    echo "note: --arena-telemetry not found in $EXP_DIR/web/lib/build.mjs; building standard bundle"
-  fi
+if [[ "$ONLY" == "all" || "$ONLY" == "exp" ]]; then
+  echo "=== [2/2] Building maplibre-rs-experimental WASM (ST + MT with arena-telemetry) ==="
+  ensure_wasm_bindgen "$EXP_DIR/Cargo.toml"
+  (
+    cd "$EXP_DIR/web/lib"
+    npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+    EXTRA_FLAGS="--esm"
+    if [[ "$PROFILE" == "release" ]]; then
+      EXTRA_FLAGS="--release $EXTRA_FLAGS"
+    fi
+    TELEMETRY_ENABLED="false"
+    if grep -q "arena-telemetry" build.mjs; then
+      EXTRA_FLAGS="$EXTRA_FLAGS --arena-telemetry"
+      TELEMETRY_ENABLED="true"
+    else
+      echo "note: --arena-telemetry not found in $EXP_DIR/web/lib/build.mjs; building standard bundle"
+    fi
 
-  # shellcheck disable=SC2086
-  RUSTUP_TOOLCHAIN=nightly node build.mjs $EXTRA_FLAGS
-  rm -rf "$OUT_DIR/exp-st" && mkdir -p "$OUT_DIR/exp-st/assets"
-  cp dist/esbuild-esm/module.js "$OUT_DIR/exp-st/module.js"
-  cp src/wasm/maplibre_bg.wasm "$OUT_DIR/exp-st/assets/maplibre_bg.wasm"
+    # shellcheck disable=SC2086
+    RUSTUP_TOOLCHAIN=nightly node build.mjs $EXTRA_FLAGS
+    rm -rf "$OUT_DIR/exp-st" && mkdir -p "$OUT_DIR/exp-st/assets"
+    cp dist/esbuild-esm/module.js "$OUT_DIR/exp-st/module.js"
+    cp src/wasm/maplibre_bg.wasm "$OUT_DIR/exp-st/assets/maplibre_bg.wasm"
 
-  # shellcheck disable=SC2086
-  RUSTUP_TOOLCHAIN=nightly node build.mjs $EXTRA_FLAGS --multithreaded
-  rm -rf "$OUT_DIR/exp-mt" && mkdir -p "$OUT_DIR/exp-mt/assets"
-  cp dist/esbuild-esm/module.js "$OUT_DIR/exp-mt/module.js"
-  cp src/wasm/maplibre_bg.wasm "$OUT_DIR/exp-mt/assets/maplibre_bg.wasm"
-  echo "$TELEMETRY_ENABLED" > "$OUT_DIR/.exp_telemetry"
-)
+    # shellcheck disable=SC2086
+    RUSTUP_TOOLCHAIN=nightly node build.mjs $EXTRA_FLAGS --multithreaded
+    rm -rf "$OUT_DIR/exp-mt" && mkdir -p "$OUT_DIR/exp-mt/assets"
+    cp dist/esbuild-esm/module.js "$OUT_DIR/exp-mt/module.js"
+    cp src/wasm/maplibre_bg.wasm "$OUT_DIR/exp-mt/assets/maplibre_bg.wasm"
+    echo "$TELEMETRY_ENABLED" > "$OUT_DIR/.exp_telemetry"
+  )
+fi
 
 echo "=== Writing public/wasm/manifest.json ==="
 EXP_SHA="$(git -C "$EXP_DIR" rev-parse --short=10 HEAD)"

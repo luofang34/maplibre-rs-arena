@@ -7,6 +7,9 @@ const crossOriginHeaders = {
 };
 
 export default defineConfig({
+  define: {
+    __ARENA_BUILD_REV__: JSON.stringify(Date.now().toString(36)),
+  },
   server: {
     headers: crossOriginHeaders,
     fs: {

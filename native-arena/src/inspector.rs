@@ -85,8 +85,13 @@ pub fn inspect_capabilities(exp_dir: &Path, mln_dir: &Path) -> Vec<CapabilityRow
     let exp_has_xr = exp_dir.join("maplibre/src/headless/map/xr.rs").exists();
     let mln_has_xr = mln_dir.join("crates/mln_xr").exists();
 
-    let exp_gaps = std::fs::read_to_string(exp_dir.join("GAPS.md")).unwrap_or_default();
-    let exp_lacks_set_style = exp_gaps.is_empty() || exp_gaps.contains("setStyle");
+    let exp_controller = std::fs::read_to_string(exp_dir.join("web/src/controller.rs"))
+        .unwrap_or_default();
+    let exp_has_set_style = exp_controller.contains("pub fn set_style");
+    let exp_has_offline = exp_dir.join("maplibre/src/io/offline.rs").exists()
+        || exp_dir.join("maplibre/src/io/offline/sqlite.rs").exists();
+    let exp_has_shaper_and_cjk = exp_dir.join("maplibre/src/font/shaper.rs").exists()
+        && exp_dir.join("maplibre/src/font/sdf/canvas2d.rs").exists();
 
     let mln_has_shaper = mln_dir.join("examples/web/shaper").exists()
         || mln_dir.join("crates/mln_text").exists();
@@ -96,7 +101,7 @@ pub fn inspect_capabilities(exp_dir: &Path, mln_dir: &Path) -> Vec<CapabilityRow
             dimension: "WebGPU Render Pipeline & Concurrency Model".into(),
             domain: "Web".into(),
             exp_status: "Full".into(),
-            exp_detail: "wgpu WebGPU (supports single-threaded worker pool and SharedArrayBuffer multithreaded pool under COEP: credentialless)".into(),
+            exp_detail: "wgpu WebGPU (4-worker single-threaded pool and SharedArrayBuffer multithreaded pool with on-arrival event waking)".into(),
             mln_status: "Full".into(),
             mln_detail: "OffscreenCanvas + dedicated Map Worker + MessageChannel Tile Workers, zero COOP/COEP requirement, built-in WebGL2 fallback".into(),
             gljs_reference: "WebGL2 + Web Worker pool".into(),
@@ -104,11 +109,11 @@ pub fn inspect_capabilities(exp_dir: &Path, mln_dir: &Path) -> Vec<CapabilityRow
         CapabilityRow {
             dimension: "Runtime Full Style Hot-Swap (setStyle)".into(),
             domain: "Web".into(),
-            exp_status: if exp_lacks_set_style { "Gap" } else { "Full" }.into(),
-            exp_detail: if exp_lacks_set_style {
-                "Supports incremental addLayer / setPaintProperty / setGeoJsonData; full setStyle hot-swap not yet implemented".into()
+            exp_status: if exp_has_set_style { "Full" } else { "Gap" }.into(),
+            exp_detail: if exp_has_set_style {
+                "Full MapController::setStyle (URL / JSON / object + TileJSON resolution) diffing sources & preserving cached tiles".into()
             } else {
-                "Full runtime style hot-swap supported".into()
+                "Supports incremental addLayer / setPaintProperty / setGeoJsonData; full setStyle hot-swap not yet implemented".into()
             },
             mln_status: "Full".into(),
             mln_detail: "Native WebMap::set_style_url with preloaded resource reuse".into(),
@@ -152,8 +157,12 @@ pub fn inspect_capabilities(exp_dir: &Path, mln_dir: &Path) -> Vec<CapabilityRow
         CapabilityRow {
             dimension: "Desktop & Mobile Native Host + Offline SQLite Cache".into(),
             domain: "Desktop & Mobile".into(),
-            exp_status: "Partial".into(),
-            exp_detail: "Supports macOS/Linux/Windows/Android/iOS/visionOS winit hosts; lacks built-in SQLite offline pack manager".into(),
+            exp_status: if exp_has_offline { "Full" } else { "Partial" }.into(),
+            exp_detail: if exp_has_offline {
+                "Supports macOS/Linux/Windows/Android/iOS/visionOS hosts + rusqlite OfflineDatabase region pack manager & MBTiles/PMTiles".into()
+            } else {
+                "Supports macOS/Linux/Windows/Android/iOS/visionOS winit hosts; lacks built-in SQLite offline pack manager".into()
+            },
             mln_status: "Full".into(),
             mln_detail: "Direct MapLibre Native C++ lineage with rusqlite offline storage, HTTP conditional cache & C ABI/FFI".into(),
             gljs_reference: "Web platform only".into(),
@@ -161,8 +170,12 @@ pub fn inspect_capabilities(exp_dir: &Path, mln_dir: &Path) -> Vec<CapabilityRow
         CapabilityRow {
             dimension: "Complex Script Shaping (RTL / Indic / HarfRust) & Local CJK Glyphs".into(),
             domain: "Style & Text".into(),
-            exp_status: "Partial".into(),
-            exp_detail: "Remote PBF SDF glyphs & collision placement; lacks HarfRust ligature shaping and local CJK Canvas SDF generation".into(),
+            exp_status: if exp_has_shaper_and_cjk { "Full" } else { "Partial" }.into(),
+            exp_detail: if exp_has_shaper_and_cjk {
+                "Native HarfRust + skrifa GSUB/GPOS shaping (optional font-shaping feature) + zero-download browser OffscreenCanvas 2D CJK SDF".into()
+            } else {
+                "Remote PBF SDF glyphs & collision placement; lacks HarfRust ligature shaping and local CJK Canvas SDF generation".into()
+            },
             mln_status: if mln_has_shaper { "Full" } else { "Partial" }.into(),
             mln_detail: "On-demand mln_web_shaper (HarfRust + skrifa + FreeType) plus zero-download localIdeographFontFamily CJK rendering".into(),
             gljs_reference: "tiny-sdf + mapbox-gl-rtl-text plugin".into(),

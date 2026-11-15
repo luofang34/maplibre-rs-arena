@@ -54,10 +54,10 @@ export const SCENARIOS: ScenarioSpec[] = [
     title: 'S2 · CJK & Multilingual Label Shaping (Tokyo)',
     category: 'Text & CJK',
     description:
-      'High-density CJK + Latin mixed scripts in central Tokyo, comparing mln-rs HarfRust/local CJK rasterization against maplibre-rs-experimental remote PBF glyph stacks.',
+      'High-density CJK + Latin mixed scripts in central Tokyo, comparing zero-download local CJK SDF rasterization and HarfRust shaping across both engines.',
     styleUrl: 'https://tiles.openfreemap.org/styles/bright',
     initialCamera: { lng: 139.7671, lat: 35.6812, zoom: 14.6, bearing: 0, pitch: 20 },
-    expCapabilityNote: 'Remote PBF glyph ranges + collision detection; no HarfRust RTL shaping yet',
+    expCapabilityNote: 'OffscreenCanvas 2D CJK SDF + Arabic shaping + optional HarfRust GSUB/GPOS',
     mlnCapabilityNote: 'On-demand mln_web_shaper (HarfRust + skrifa) + localIdeographFontFamily CJK SDF',
     durationMs: 7000,
     targetBudgetMs: 16.67,

@@ -1,17 +1,17 @@
 {
-  "generatedAt": "2026-11-14T00:32:35Z",
+  "generatedAt": "2026-11-15T03:11:12Z",
   "commits": {
-    "maplibreRsExperimental": "78b4001634",
-    "mlnRs": "6768c7f5b4",
+    "maplibreRsExperimental": "03c4850efd",
+    "mlnRs": "0ca2ff95fb",
     "maplibreGlJs": "5.3.0"
   },
-  "hardwareProfile": "Static Capability Audit on macos aarch64 (pass `--live` to run local GPU ABBA rounds)",
+  "hardwareProfile": "macos aarch64 (5 ABBA rounds)",
   "capabilities": [
     {
       "dimension": "WebGPU Render Pipeline & Concurrency Model",
       "domain": "Web",
       "expStatus": "Full",
-      "expDetail": "wgpu WebGPU (supports single-threaded worker pool and SharedArrayBuffer multithreaded pool under COEP: credentialless)",
+      "expDetail": "wgpu WebGPU (4-worker single-threaded pool and SharedArrayBuffer multithreaded pool with on-arrival event waking)",
       "mlnStatus": "Full",
       "mlnDetail": "OffscreenCanvas + dedicated Map Worker + MessageChannel Tile Workers, zero COOP/COEP requirement, built-in WebGL2 fallback",
       "gljsReference": "WebGL2 + Web Worker pool"
@@ -20,7 +20,7 @@
       "dimension": "Runtime Full Style Hot-Swap (setStyle)",
       "domain": "Web",
       "expStatus": "Full",
-      "expDetail": "Full runtime style hot-swap supported",
+      "expDetail": "Full MapController::setStyle (URL / JSON / object + TileJSON resolution) diffing sources & preserving cached tiles",
       "mlnStatus": "Full",
       "mlnDetail": "Native WebMap::set_style_url with preloaded resource reuse",
       "gljsReference": "Full map.setStyle() support"
@@ -55,8 +55,8 @@
     {
       "dimension": "Desktop & Mobile Native Host + Offline SQLite Cache",
       "domain": "Desktop & Mobile",
-      "expStatus": "Partial",
-      "expDetail": "Supports macOS/Linux/Windows/Android/iOS/visionOS winit hosts; lacks built-in SQLite offline pack manager",
+      "expStatus": "Full",
+      "expDetail": "Supports macOS/Linux/Windows/Android/iOS/visionOS hosts + rusqlite OfflineDatabase region pack manager & MBTiles/PMTiles",
       "mlnStatus": "Full",
       "mlnDetail": "Direct MapLibre Native C++ lineage with rusqlite offline storage, HTTP conditional cache & C ABI/FFI",
       "gljsReference": "Web platform only"
@@ -64,8 +64,8 @@
     {
       "dimension": "Complex Script Shaping (RTL / Indic / HarfRust) & Local CJK Glyphs",
       "domain": "Style & Text",
-      "expStatus": "Partial",
-      "expDetail": "Remote PBF SDF glyphs & collision placement; lacks HarfRust ligature shaping and local CJK Canvas SDF generation",
+      "expStatus": "Full",
+      "expDetail": "Native HarfRust + skrifa GSUB/GPOS shaping (optional font-shaping feature) + zero-download browser OffscreenCanvas 2D CJK SDF",
       "mlnStatus": "Full",
       "mlnDetail": "On-demand mln_web_shaper (HarfRust + skrifa + FreeType) plus zero-download localIdeographFontFamily CJK rendering",
       "gljsReference": "tiny-sdf + mapbox-gl-rtl-text plugin"
@@ -73,46 +73,18 @@
   ],
   "nativeAbba": [
     {
-      "scenario": "S1 · 2D Dense Urban (1024×1024 Headless)",
-      "workload": "Steady-state vector render",
-      "expMedianMs": 2.45,
-      "mlnMedianMs": 2.18,
-      "deltaPct": 12.39,
-      "mannWhitneyP": 0.018,
+      "scenario": "Live Native Headless Probe",
+      "workload": "ABBA (5 rounds)",
+      "expMedianMs": 117.450417,
+      "mlnMedianMs": 6.657209,
+      "deltaPct": 1664.259121202294,
+      "mannWhitneyP": 0.0022023577164516084,
       "verdict": "mln-rs faster",
-      "expMinstr": 18.4,
-      "mlnMinstr": 15.9,
-      "expPeakRssMib": null,
-      "mlnPeakRssMib": null,
-      "notes": "Baseline reference; run `just native-bench` to replace with live local ABBA hardware measurements"
-    },
-    {
-      "scenario": "S5 · 3D DEM Terrain + Draping (Alps 66°)",
-      "workload": "3D elevation mesh + DrapeCache",
-      "expMedianMs": 4.82,
-      "mlnMedianMs": 0.0,
-      "deltaPct": 0.0,
-      "mannWhitneyP": 1.0,
-      "verdict": "tie / capability-only",
-      "expMinstr": 34.2,
+      "expMinstr": null,
       "mlnMinstr": null,
-      "expPeakRssMib": null,
-      "mlnPeakRssMib": null,
-      "notes": "Exclusive to maplibre-rs-experimental (mln-rs does not implement 3D terrain mesh)"
-    },
-    {
-      "scenario": "S7 · Native XR Dual-Eye Stereo (2×2048×2048)",
-      "workload": "HeadlessMap::run_xr_frame (StereoReuse)",
-      "expMedianMs": 6.95,
-      "mlnMedianMs": 0.0,
-      "deltaPct": 0.0,
-      "mannWhitneyP": 1.0,
-      "verdict": "tie / capability-only",
-      "expMinstr": 46.8,
-      "mlnMinstr": null,
-      "expPeakRssMib": null,
-      "mlnPeakRssMib": null,
-      "notes": "Exclusive to maplibre-rs-experimental (< 11.11ms 90Hz HMD frame budget)"
+      "expPeakRssMib": 103.90625,
+      "mlnPeakRssMib": 6.78125,
+      "notes": "CPU user+sys median: exp=175.3ms, mln=5.5ms (wait4 rusage)"
     }
   ],
   "conformanceSummary": {

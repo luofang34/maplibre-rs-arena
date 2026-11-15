@@ -9,6 +9,8 @@ import type {
 } from '../shared/types';
 import { buildSensorGrid } from './dynamic-geojson';
 
+declare const __ARENA_BUILD_REV__: string | undefined;
+
 interface ExpCameraState {
   center: [number, number];
   zoom: number;
@@ -25,9 +27,11 @@ interface ExpArenaTelemetry {
   draws: number;
   drapeRedraws: number;
   prefetchDrapes: number;
+  loaded?: boolean;
   settled: boolean;
   wasmMemoryBytes: number;
   camera: ExpCameraState;
+  redrawReasons?: Record<string, boolean>;
   stages: Array<{ name: string; ms: number }>;
 }
 
@@ -39,17 +43,150 @@ interface ExpMapInstance {
   setGeoJsonData(sourceId: string, data: object | string): Promise<void>;
   setArenaCameraListener?: (cb: ((c: ExpCameraState) => void) | null) => void;
   setArenaTelemetryListener?: (cb: ((t: ExpArenaTelemetry) => void) | null) => void;
+  waitArenaLoaded?: () => Promise<ExpCameraState>;
   waitArenaIdle?: () => Promise<ExpCameraState>;
+  destroy?: () => void;
+  remove?: () => void;
 }
 
 interface ExpModuleExports {
   startMapLibre(
-    wasmPath: string | undefined,
+    wasmPath: string | WebAssembly.Module | undefined,
     workerPath: string | undefined,
     styleJson?: string,
     imageProviderModules?: string[],
     canvasId?: string,
   ): Promise<ExpMapInstance | undefined>;
+}
+
+const compiledWasmCache = new Map<string, Promise<WebAssembly.Module>>();
+const rawWindowFetch = window.fetch.bind(window);
+const activeFetchTrackers = new Set<{ onStart: () => void; onEnd: () => void }>();
+let fetchHookInstalled = false;
+
+function ensureGlobalFetchTracker(): void {
+  if (fetchHookInstalled) return;
+  fetchHookInstalled = true;
+  window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+    if (activeFetchTrackers.size === 0) {
+      return rawWindowFetch(input, init);
+    }
+    const trackers = Array.from(activeFetchTrackers);
+    for (const t of trackers) t.onStart();
+    let doneFlag = false;
+    const done = () => {
+      if (!doneFlag) {
+        doneFlag = true;
+        for (const t of trackers) t.onEnd();
+      }
+    };
+    return rawWindowFetch(input, init).then(
+      (res) => {
+        const cloneAb = res.arrayBuffer.bind(res);
+        res.arrayBuffer = () => cloneAb().finally(done);
+        window.setTimeout(done, 8000);
+        return res;
+      },
+      (err) => {
+        done();
+        throw err;
+      },
+    );
+  };
+}
+
+function compileWasmOnce(wasmUrl: string): Promise<WebAssembly.Module> {
+  let cached = compiledWasmCache.get(wasmUrl);
+  if (!cached) {
+    cached = (async () => {
+      if (typeof WebAssembly.compileStreaming === 'function') {
+        try {
+          return await WebAssembly.compileStreaming(rawWindowFetch(wasmUrl));
+        } catch {
+          // Fall back if server omits application/wasm MIME header
+        }
+      }
+      const resp = await rawWindowFetch(wasmUrl);
+      if (!resp.ok) {
+        throw new Error(`HTTP ${resp.status} fetching ${wasmUrl}`);
+      }
+      return WebAssembly.compile(await resp.arrayBuffer());
+    })();
+    cached.catch(() => compiledWasmCache.delete(wasmUrl));
+    compiledWasmCache.set(wasmUrl, cached);
+  }
+  return cached;
+}
+
+let sharedCapturedMemory: WebAssembly.Memory | null = null;
+let sharedLiveBufferBytes = 0;
+let memoryHooksInstalled = false;
+
+function ensureMemoryHooks(): void {
+  if (memoryHooksInstalled) return;
+  memoryHooksInstalled = true;
+
+  const scanImportsAndInstance = (importObject: WebAssembly.Imports | undefined, maybeResult: unknown) => {
+    if (importObject) {
+      for (const ns of Object.values(importObject)) {
+        if (ns && typeof ns === 'object') {
+          for (const val of Object.values(ns as Record<string, unknown>)) {
+            if (val instanceof WebAssembly.Memory) sharedCapturedMemory = val;
+          }
+        }
+      }
+    }
+    const inst =
+      maybeResult && typeof maybeResult === 'object' && 'instance' in maybeResult
+        ? (maybeResult as WebAssembly.WebAssemblyInstantiatedSource).instance
+        : (maybeResult as WebAssembly.Instance | null);
+    if (inst && inst.exports) {
+      for (const val of Object.values(inst.exports)) {
+        if (val instanceof WebAssembly.Memory) sharedCapturedMemory = val;
+      }
+    }
+  };
+
+  const origInstantiate = WebAssembly.instantiate.bind(WebAssembly);
+  WebAssembly.instantiate = (async (source: BufferSource | WebAssembly.Module, importObject?: WebAssembly.Imports) => {
+    const res = await origInstantiate(source as WebAssembly.Module, importObject);
+    scanImportsAndInstance(importObject, res);
+    return res;
+  }) as typeof WebAssembly.instantiate;
+
+  if (typeof WebAssembly.instantiateStreaming === 'function') {
+    const origStreaming = WebAssembly.instantiateStreaming.bind(WebAssembly);
+    WebAssembly.instantiateStreaming = (async (
+      source: Response | PromiseLike<Response>,
+      importObject?: WebAssembly.Imports,
+    ) => {
+      const res = await origStreaming(source, importObject);
+      scanImportsAndInstance(importObject, res);
+      return res;
+    }) as typeof WebAssembly.instantiateStreaming;
+  }
+
+  const devProto = (globalThis as unknown as { GPUDevice?: { prototype: Record<string, unknown> } }).GPUDevice?.prototype;
+  if (devProto && typeof devProto.createBuffer === 'function') {
+    const origCreateBuffer = devProto.createBuffer as (desc: { size?: number }) => { destroy?: () => void };
+    devProto.createBuffer = function (this: unknown, desc: { size?: number }) {
+      const sz = Number(desc?.size ?? 0);
+      sharedLiveBufferBytes += sz;
+      const buf = origCreateBuffer.call(this, desc);
+      if (buf && typeof buf.destroy === 'function') {
+        const origDestroy = buf.destroy.bind(buf);
+        let freed = false;
+        buf.destroy = () => {
+          if (!freed) {
+            freed = true;
+            sharedLiveBufferBytes = Math.max(0, sharedLiveBufferBytes - sz);
+          }
+          origDestroy();
+        };
+      }
+      return buf;
+    };
+  }
 }
 
 /**
@@ -74,72 +211,7 @@ function installWebGpuFallbackMeter(
     gpuMs: number | null;
   }) => void,
 ): WebGpuFallbackMeter {
-  let capturedMemory: WebAssembly.Memory | null = null;
-  let liveBufferBytes = 0;
-
-  // Capture WASM linear memory reference once at instantiation (0 runtime cost)
-  const scanImportsAndInstance = (importObject: WebAssembly.Imports | undefined, maybeResult: unknown) => {
-    if (importObject) {
-      for (const ns of Object.values(importObject)) {
-        if (ns && typeof ns === 'object') {
-          for (const val of Object.values(ns as Record<string, unknown>)) {
-            if (val instanceof WebAssembly.Memory) capturedMemory = val;
-          }
-        }
-      }
-    }
-    const inst =
-      maybeResult && typeof maybeResult === 'object' && 'instance' in maybeResult
-        ? (maybeResult as WebAssembly.WebAssemblyInstantiatedSource).instance
-        : (maybeResult as WebAssembly.Instance | null);
-    if (inst && inst.exports) {
-      for (const val of Object.values(inst.exports)) {
-        if (val instanceof WebAssembly.Memory) capturedMemory = val;
-      }
-    }
-  };
-
-  const origInstantiate = WebAssembly.instantiate.bind(WebAssembly);
-  WebAssembly.instantiate = (async (source: BufferSource | WebAssembly.Module, importObject?: WebAssembly.Imports) => {
-    const res = await origInstantiate(source as WebAssembly.Module, importObject);
-    scanImportsAndInstance(importObject, res);
-    return res;
-  }) as typeof WebAssembly.instantiate;
-
-  if (typeof WebAssembly.instantiateStreaming === 'function') {
-    const origStreaming = WebAssembly.instantiateStreaming.bind(WebAssembly);
-    WebAssembly.instantiateStreaming = (async (
-      source: Response | PromiseLike<Response>,
-      importObject?: WebAssembly.Imports,
-    ) => {
-      const res = await origStreaming(source, importObject);
-      scanImportsAndInstance(importObject, res);
-      return res;
-    }) as typeof WebAssembly.instantiateStreaming;
-  }
-
-  // Track live GPU buffer allocations at creation/destroy (negligible setup-only calls)
-  const devProto = (globalThis as unknown as { GPUDevice?: { prototype: Record<string, unknown> } }).GPUDevice?.prototype;
-  if (devProto && typeof devProto.createBuffer === 'function') {
-    const origCreateBuffer = devProto.createBuffer as (desc: { size?: number }) => { destroy?: () => void };
-    devProto.createBuffer = function (this: unknown, desc: { size?: number }) {
-      const sz = Number(desc?.size ?? 0);
-      liveBufferBytes += sz;
-      const buf = origCreateBuffer.call(this, desc);
-      if (buf && typeof buf.destroy === 'function') {
-        const origDestroy = buf.destroy.bind(buf);
-        let freed = false;
-        buf.destroy = () => {
-          if (!freed) {
-            freed = true;
-            liveBufferBytes = Math.max(0, liveBufferBytes - sz);
-          }
-          origDestroy();
-        };
-      }
-      return buf;
-    };
-  }
+  ensureMemoryHooks();
 
   let enabled = false;
   let frameDraws = 0;
@@ -158,12 +230,12 @@ function installWebGpuFallbackMeter(
   const queueProto = (globalThis as unknown as { GPUQueue?: { prototype: Record<string, unknown> } }).GPUQueue
     ?.prototype;
 
-  const origDraw = rpeProto?.draw as ((...args: unknown[]) => unknown) | undefined;
-  const origDrawIndexed = rpeProto?.drawIndexed as ((...args: unknown[]) => unknown) | undefined;
-  const origBeginRenderPass = encProto?.beginRenderPass as ((...args: unknown[]) => unknown) | undefined;
-  const origWriteBuffer = queueProto?.writeBuffer as ((...args: unknown[]) => unknown) | undefined;
-  const origWriteTexture = queueProto?.writeTexture as ((...args: unknown[]) => unknown) | undefined;
-  const origSubmit = queueProto?.submit as ((cmdBufs: unknown) => unknown) | undefined;
+  let origDraw: ((...args: unknown[]) => unknown) | undefined;
+  let origDrawIndexed: ((...args: unknown[]) => unknown) | undefined;
+  let origBeginRenderPass: ((...args: unknown[]) => unknown) | undefined;
+  let origWriteBuffer: ((...args: unknown[]) => unknown) | undefined;
+  let origWriteTexture: ((...args: unknown[]) => unknown) | undefined;
+  let origSubmit: ((cmdBufs: unknown) => unknown) | undefined;
 
   const setEnabled = (on: boolean) => {
     if (on === enabled) return;
@@ -171,51 +243,64 @@ function installWebGpuFallbackMeter(
     if (!rpeProto || !encProto || !queueProto) return;
 
     if (on) {
+      origDraw = rpeProto.draw as ((...args: unknown[]) => unknown) | undefined;
+      origDrawIndexed = rpeProto.drawIndexed as ((...args: unknown[]) => unknown) | undefined;
+      origBeginRenderPass = encProto.beginRenderPass as ((...args: unknown[]) => unknown) | undefined;
+      origWriteBuffer = queueProto.writeBuffer as ((...args: unknown[]) => unknown) | undefined;
+      origWriteTexture = queueProto.writeTexture as ((...args: unknown[]) => unknown) | undefined;
+      origSubmit = queueProto.submit as ((cmdBufs: unknown) => unknown) | undefined;
+
       lastSubmitAt = performance.now();
       if (origDraw) {
+        const fn = origDraw;
         rpeProto.draw = function (this: unknown, ...args: unknown[]) {
           frameDraws++;
-          return origDraw.apply(this, args);
+          return fn.apply(this, args);
         };
       }
       if (origDrawIndexed) {
+        const fn = origDrawIndexed;
         rpeProto.drawIndexed = function (this: unknown, ...args: unknown[]) {
           frameDraws++;
-          return origDrawIndexed.apply(this, args);
+          return fn.apply(this, args);
         };
       }
       if (origBeginRenderPass) {
+        const fn = origBeginRenderPass;
         encProto.beginRenderPass = function (this: unknown, ...args: unknown[]) {
           if (framePasses === 0) frameEncodeStart = performance.now();
           framePasses++;
-          return origBeginRenderPass.apply(this, args);
+          return fn.apply(this, args);
         };
       }
       if (origWriteBuffer) {
+        const fn = origWriteBuffer;
         queueProto.writeBuffer = function (this: unknown, ...args: unknown[]) {
           const t0 = performance.now();
           const sizeArg = args[4];
           const dataArg = args[2] as { byteLength?: number } | undefined;
           frameUploadBytes += typeof sizeArg === 'number' ? sizeArg : Number(dataArg?.byteLength ?? 0);
-          const out = origWriteBuffer.apply(this, args);
+          const out = fn.apply(this, args);
           frameUploadMs += performance.now() - t0;
           return out;
         };
       }
       if (origWriteTexture) {
+        const fn = origWriteTexture;
         queueProto.writeTexture = function (this: unknown, ...args: unknown[]) {
           const t0 = performance.now();
           const dataArg = args[1] as { byteLength?: number } | undefined;
           frameUploadBytes += Number(dataArg?.byteLength ?? 0);
-          const out = origWriteTexture.apply(this, args);
+          const out = fn.apply(this, args);
           frameUploadMs += performance.now() - t0;
           return out;
         };
       }
       if (origSubmit) {
+        const fn = origSubmit;
         queueProto.submit = function (this: { onSubmittedWorkDone?: () => Promise<void> }, cmdBufs: unknown) {
           const t0 = performance.now();
-          const out = origSubmit.call(this, cmdBufs);
+          const out = fn.call(this, cmdBufs);
           const now = performance.now();
           if (framePasses > 0 || frameDraws > 0) {
             const encodeMs =
@@ -267,8 +352,8 @@ function installWebGpuFallbackMeter(
 
   return {
     setEnabled,
-    getWasmBytes: () => capturedMemory?.buffer.byteLength ?? 0,
-    getGpuBufferBytes: () => liveBufferBytes,
+    getWasmBytes: () => sharedCapturedMemory?.buffer.byteLength ?? 0,
+    getGpuBufferBytes: () => sharedLiveBufferBytes,
   };
 }
 
@@ -332,56 +417,45 @@ export async function createExpRunner(
   }
 
   const variantDir = isMt ? '/wasm/exp-mt' : '/wasm/exp-st';
-  const moduleJsUrl = new URL(`${variantDir}/module.js`, location.origin).href;
-  const wasmUrl = new URL(`${variantDir}/assets/maplibre_bg.wasm`, location.origin).href;
+  const buildRev = typeof __ARENA_BUILD_REV__ === 'string' ? __ARENA_BUILD_REV__ : 'dev';
+  const moduleJsUrl = new URL(`${variantDir}/module.js?v=${buildRev}`, location.origin).href;
+  const wasmUrl = new URL(`${variantDir}/assets/maplibre_bg.wasm?v=${buildRev}`, location.origin).href;
 
   emitStatus({ state: 'booting', message: `Checking ${cfg.engineId} WASM & style document…` });
 
   let requestsCount = 0;
   let pendingRequests = 0;
-  const origFetch = window.fetch.bind(window);
-  window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
-    requestsCount++;
-    pendingRequests++;
-    let doneFlag = false;
-    const done = () => {
-      if (!doneFlag) {
-        doneFlag = true;
-        pendingRequests = Math.max(0, pendingRequests - 1);
-      }
-    };
-    return origFetch(input, init).then(
-      (res) => {
-        const cloneAb = res.arrayBuffer.bind(res);
-        res.arrayBuffer = () => cloneAb().finally(done);
-        window.setTimeout(done, 8000);
-        return res;
-      },
-      (err) => {
-        done();
-        throw err;
-      },
-    );
+  ensureGlobalFetchTracker();
+  const fetchTracker = {
+    onStart: () => {
+      requestsCount++;
+      pendingRequests++;
+    },
+    onEnd: () => {
+      pendingRequests = Math.max(0, pendingRequests - 1);
+    },
   };
-
-  try {
-    const checkResp = await origFetch(wasmUrl, { method: 'HEAD' });
-    const ct = checkResp.headers.get('content-type') ?? '';
-    if (!checkResp.ok || ct.includes('text/html')) {
-      emitStatus({
-        state: 'missing-wasm',
-        message:
-          'maplibre-rs-experimental WASM artifacts not found. Run `just build-wasm` locally or trigger the GitHub Actions workflow.',
-      });
-      return makeFallbackBridge(cfg, 'WASM Not Built');
-    }
-  } catch (err) {
-    emitStatus({ state: 'missing-wasm', message: `Unable to fetch ${wasmUrl}: ${String(err)}` });
-    return makeFallbackBridge(cfg, 'WASM Missing');
-  }
+  activeFetchTrackers.add(fetchTracker);
 
   const resolvedStyleUrl = new URL(cfg.styleUrl, location.origin).href;
-  const styleResp = await origFetch(resolvedStyleUrl);
+  let styleResp: Response;
+  let expMod: ExpModuleExports;
+  let wasmModule: WebAssembly.Module;
+  try {
+    [styleResp, expMod, wasmModule] = await Promise.all([
+      rawWindowFetch(resolvedStyleUrl),
+      import(/* @vite-ignore */ moduleJsUrl) as Promise<ExpModuleExports>,
+      compileWasmOnce(wasmUrl),
+    ]);
+  } catch (err) {
+    activeFetchTrackers.delete(fetchTracker);
+    emitStatus({
+      state: 'missing-wasm',
+      message: `Unable to load maplibre-rs-experimental bundle (${String(err)}). Run \`just build-wasm\` locally.`,
+    });
+    return makeFallbackBridge(cfg, 'WASM Not Built');
+  }
+
   const styleObj = (await styleResp.json()) as Record<string, unknown>;
   styleObj.center = [cfg.camera.lng + eyeOffset, cfg.camera.lat];
   styleObj.zoom = cfg.camera.zoom;
@@ -399,8 +473,6 @@ export async function createExpRunner(
   const ready = new Promise<{ loadedMs: number }>((resolve) => {
     resolveReady = resolve;
   });
-
-  const bootStart = performance.now();
 
   const fallbackMeter = installWebGpuFallbackMeter((sub) => {
     if (!telemetryEnabled || !telemetryCb) return;
@@ -437,12 +509,21 @@ export async function createExpRunner(
 
   emitStatus({ state: 'loading', message: 'Initializing wgpu device & rendering pipeline…' });
 
-  const expMod = (await import(/* @vite-ignore */ moduleJsUrl)) as ExpModuleExports;
-  const map = await expMod.startMapLibre(wasmUrl, undefined, styleJson, [], canvas.id);
+  let map: Awaited<ReturnType<ExpModuleExports['startMapLibre']>>;
+  try {
+    map = await expMod.startMapLibre(wasmModule, undefined, styleJson, [], canvas.id);
+  } catch (err) {
+    activeFetchTrackers.delete(fetchTracker);
+    emitStatus({ state: 'missing-wasm', message: `Failed to instantiate ${wasmUrl}: ${String(err)}` });
+    return makeFallbackBridge(cfg, 'WASM Missing');
+  }
   if (!map) {
+    activeFetchTrackers.delete(fetchTracker);
     emitStatus({ state: 'unsupported', message: 'maplibre-rs-experimental failed to initialize WebGPU on this device.' });
     return makeFallbackBridge(cfg, 'Init Failed');
   }
+
+  const bootStart = performance.now();
 
   const hasNativeTelemetry = typeof map.setArenaTelemetryListener === 'function';
 
@@ -505,10 +586,11 @@ export async function createExpRunner(
       map.setArenaTelemetryListener?.(
         enabled
           ? (t) => {
+              (window as unknown as { __lastExpTelemetry?: ExpArenaTelemetry }).__lastExpTelemetry = t;
               const now = performance.now();
               const interval = Math.max(0.1, now - lastFrameAt);
               lastFrameAt = now;
-              if (loadedMs === null && t.settled) {
+              if (loadedMs === null && (t.loaded ?? t.settled)) {
                 loadedMs = now - bootStart;
                 emitStatus({ state: 'ready', message: `Loaded in ${Math.round(loadedMs)} ms`, loadedMs });
                 resolveReady({ loadedMs });
@@ -542,18 +624,26 @@ export async function createExpRunner(
 
   wireTelemetry(telemetryEnabled);
 
+  let destroyed = false;
+
   void (async () => {
-    if (typeof map.waitArenaIdle === 'function') {
-      await map.waitArenaIdle();
-    } else {
-      await map.getCamera();
-      // Wait briefly for initial network tiles to settle on cold start
-      const deadline = performance.now() + 4000;
-      while (pendingRequests > 0 && performance.now() < deadline) {
-        await new Promise((r) => window.setTimeout(r, 80));
+    try {
+      if (typeof map.waitArenaLoaded === 'function') {
+        await map.waitArenaLoaded();
+      } else if (typeof map.waitArenaIdle === 'function') {
+        await map.waitArenaIdle();
+      } else {
+        await map.getCamera();
+        // Wait briefly for initial network tiles to settle on cold start
+        const deadline = performance.now() + 4000;
+        while (!destroyed && pendingRequests > 0 && performance.now() < deadline) {
+          await new Promise((r) => window.setTimeout(r, 80));
+        }
       }
+    } catch {
+      // Ignore shutdown while waiting for initial idle.
     }
-    if (loadedMs === null) {
+    if (!destroyed && loadedMs === null) {
       loadedMs = performance.now() - bootStart;
       emitStatus({ state: 'ready', message: `Loaded in ${Math.round(loadedMs)} ms`, loadedMs });
       resolveReady({ loadedMs });
@@ -566,31 +656,39 @@ export async function createExpRunner(
     ready,
     getCamera: () => currentCamera,
     followCamera: (pose) => {
+      if (destroyed) return;
       currentCamera = { ...pose };
       followingSilently = true;
-      void map.jumpTo({
-        center: [pose.lng + eyeOffset, pose.lat],
-        zoom: pose.zoom,
-        bearing: pose.bearing,
-        pitch: pose.pitch,
-        roll: pose.roll,
-      });
+      void map
+        .jumpTo({
+          center: [pose.lng + eyeOffset, pose.lat],
+          zoom: pose.zoom,
+          bearing: pose.bearing,
+          pitch: pose.pitch,
+          roll: pose.roll,
+        })
+        .catch(() => {});
     },
     jumpTo: (pose) => {
+      if (destroyed) return;
       currentCamera = { ...pose };
       followingSilently = true;
-      void map.jumpTo({
-        center: [pose.lng + eyeOffset, pose.lat],
-        zoom: pose.zoom,
-        bearing: pose.bearing,
-        pitch: pose.pitch,
-        roll: pose.roll,
-      });
+      void map
+        .jumpTo({
+          center: [pose.lng + eyeOffset, pose.lat],
+          zoom: pose.zoom,
+          bearing: pose.bearing,
+          pitch: pose.pitch,
+          roll: pose.roll,
+        })
+        .catch(() => {});
     },
     stop: () => {
-      void map.stop();
+      if (destroyed) return;
+      void map.stop().catch(() => {});
     },
     setTelemetryEnabled: (enabled) => {
+      if (destroyed && enabled) return;
       wireTelemetry(enabled);
     },
     onCameraChange: (cb) => {
@@ -603,35 +701,43 @@ export async function createExpRunner(
       statusCb = cb;
     },
     waitIdle: async (timeoutMs = 8000) => {
+      if (destroyed) return currentCamera;
       if (typeof map.waitArenaIdle === 'function') {
-        const res = await Promise.race([
-          map.waitArenaIdle(),
-          new Promise<null>((r) => window.setTimeout(() => r(null), timeoutMs)),
-        ]);
-        if (res) {
-          return {
-            lng: res.center[0] - eyeOffset,
-            lat: res.center[1],
-            zoom: res.zoom,
-            bearing: res.bearing,
-            pitch: res.pitch,
-          };
+        try {
+          const res = await Promise.race([
+            map.waitArenaIdle(),
+            new Promise<null>((r) => window.setTimeout(() => r(null), timeoutMs)),
+          ]);
+          if (res && Array.isArray(res.center)) {
+            return {
+              lng: res.center[0] - eyeOffset,
+              lat: res.center[1],
+              zoom: res.zoom,
+              bearing: res.bearing,
+              pitch: res.pitch,
+            };
+          }
+        } catch {
+          // Ignore teardown during waitIdle
         }
       } else {
         const deadline = performance.now() + Math.min(timeoutMs, 2500);
-        while (pendingRequests > 0 && performance.now() < deadline) {
+        while (!destroyed && pendingRequests > 0 && performance.now() < deadline) {
           await new Promise((r) => window.setTimeout(r, 60));
         }
       }
       return currentCamera;
     },
     readPixels: async () => {
-      await map.jumpTo({
-        center: [currentCamera.lng + eyeOffset, currentCamera.lat],
-        zoom: currentCamera.zoom,
-        bearing: currentCamera.bearing,
-        pitch: currentCamera.pitch,
-      });
+      if (destroyed) return null;
+      await map
+        .jumpTo({
+          center: [currentCamera.lng + eyeOffset, currentCamera.lat],
+          zoom: currentCamera.zoom,
+          bearing: currentCamera.bearing,
+          pitch: currentCamera.pitch,
+        })
+        .catch(() => {});
       await new Promise((r) => requestAnimationFrame(r));
       const w = canvas.width;
       const h = canvas.height;
@@ -644,12 +750,17 @@ export async function createExpRunner(
       return { width: w, height: h, rgba: img.data };
     },
     stepDynamicStress: (tick) => {
+      if (destroyed) return;
       const data = buildSensorGrid(currentCamera, tick);
-      void map.setGeoJsonData('arena_sensors', data);
+      void map.setGeoJsonData('arena_sensors', data).catch(() => {});
     },
     destroy: () => {
+      if (destroyed) return;
+      destroyed = true;
+      activeFetchTrackers.delete(fetchTracker);
       wireTelemetry(false);
       map.setArenaCameraListener?.(null);
+      map.destroy?.();
     },
   };
 }

@@ -56,9 +56,14 @@ export async function executeSoloFlightPair(
       const step = () => {
         const elapsed = performance.now() - startFlight;
         const t = Math.min(1, elapsed / scenario.durationMs);
-        bridge.jumpTo(scenario.flightPoseAt(t));
-        if (scenario.dynamicGeoJsonStress) {
-          bridge.stepDynamicStress?.(tick++);
+        try {
+          bridge.jumpTo(scenario.flightPoseAt(t));
+          if (scenario.dynamicGeoJsonStress) {
+            bridge.stepDynamicStress?.(tick++);
+          }
+        } catch {
+          resolve();
+          return;
         }
         if (t < 1) {
           requestAnimationFrame(step);
