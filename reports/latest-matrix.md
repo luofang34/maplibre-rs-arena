@@ -1,7 +1,7 @@
 # MapLibre Rust Arena — Latest Matrix Report
 
-- **Generated At**: `2026-11-15T14:15:58Z`
-- **`maplibre-rs-experimental` rev**: `4068f5d463`
+- **Generated At**: `2026-11-15T18:21:21Z`
+- **`maplibre-rs-experimental` rev**: `a66a7f6394`
 - **`mln-rs` rev**: `0ca2ff95fb`
 - **Hardware Profile**: Static Capability Audit on macos aarch64 (pass `--live` to run local GPU ABBA rounds)
 

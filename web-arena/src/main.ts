@@ -154,6 +154,7 @@ async function main() {
     soloWebRuns: [],
   };
   const liveSoloRuns: SoloRunMetrics[] = [];
+  (window as unknown as { __arenaLiveSoloRuns?: SoloRunMetrics[] }).__arenaLiveSoloRuns = liveSoloRuns;
 
   const defaultLeft: EngineId = (params.get('left') as EngineId) || (window.crossOriginIsolated ? 'exp-mt' : 'exp-st');
   const defaultRight: EngineId = (params.get('right') as EngineId) || 'mln-webgpu';

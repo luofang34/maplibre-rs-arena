@@ -25,11 +25,18 @@ interface ExpArenaTelemetry {
   gpuMs?: number | null;
   uploadBytes: number;
   draws: number;
+  passes?: number;
+  setVertexBuffers?: number;
+  writeBufferCalls?: number;
+  writeBufferBytes?: number;
   drapeRedraws: number;
   prefetchDrapes: number;
   loaded?: boolean;
   settled: boolean;
   wasmMemoryBytes: number;
+  gpuMemoryBytes?: number;
+  pendingRequests?: number;
+  totalRequests?: number;
   camera: ExpCameraState;
   redrawReasons?: Record<string, boolean>;
   stages: Array<{ name: string; ms: number }>;
@@ -581,12 +588,64 @@ export async function createExpRunner(
   }
 
   const wireTelemetry = (enabled: boolean) => {
+    const win = window as unknown as {
+      __lastExpTelemetry?: ExpArenaTelemetry;
+      __expTelemetryFrames?: ExpArenaTelemetry[];
+    };
+    if (!enabled && Array.isArray(win.__expTelemetryFrames) && win.__expTelemetryFrames.length > 0) {
+      const frames = win.__expTelemetryFrames;
+      const n = frames.length;
+      let sumPasses = 0;
+      let sumSetVb = 0;
+      let sumWbCalls = 0;
+      let sumWbBytes = 0;
+      let sumPhaseSortMs = 0;
+      for (const f of frames) {
+        sumPasses += f.passes ?? 0;
+        sumSetVb += f.setVertexBuffers ?? 0;
+        sumWbCalls += f.writeBufferCalls ?? 0;
+        sumWbBytes += f.writeBufferBytes ?? 0;
+        for (const st of f.stages) {
+          if (/phasesort|collision/i.test(st.name)) {
+            sumPhaseSortMs += st.ms;
+          }
+        }
+      }
+      try {
+        const parentWin = window.parent as unknown as { __arenaExpRunHistory?: unknown[] };
+        if (parentWin && parentWin !== (window as unknown)) {
+          parentWin.__arenaExpRunHistory ??= [];
+          parentWin.__arenaExpRunHistory.unshift({
+            engineId: cfg.engineId,
+            scenario: new URLSearchParams(location.search).get('scenario') ?? '',
+            frames: n,
+            avgPasses: sumPasses / n,
+            avgSetVertexBuf: sumSetVb / n,
+            avgWriteBufCalls: sumWbCalls / n,
+            avgWriteBufKiB: sumWbBytes / n / 1024,
+            avgPhaseSortMs: sumPhaseSortMs / n,
+          });
+        }
+      } catch {
+        // Ignore cross-frame access errors when standalone.
+      }
+    }
     telemetryEnabled = enabled;
+    if (enabled) {
+      win.__expTelemetryFrames = [];
+    }
     if (hasNativeTelemetry) {
       map.setArenaTelemetryListener?.(
         enabled
           ? (t) => {
-              (window as unknown as { __lastExpTelemetry?: ExpArenaTelemetry }).__lastExpTelemetry = t;
+              const win = window as unknown as {
+                __lastExpTelemetry?: ExpArenaTelemetry;
+                __expTelemetryFrames?: ExpArenaTelemetry[];
+              };
+              win.__lastExpTelemetry = t;
+              if (Array.isArray(win.__expTelemetryFrames) && win.__expTelemetryFrames.length < 4096) {
+                win.__expTelemetryFrames.push(t);
+              }
               const now = performance.now();
               const interval = Math.max(0.1, now - lastFrameAt);
               lastFrameAt = now;
@@ -605,11 +664,19 @@ export async function createExpRunner(
                 nativeStages: t.stages,
                 drawCalls: t.draws,
                 wasmMemoryBytes: t.wasmMemoryBytes || fallbackMeter.getWasmBytes(),
-                gpuMemoryBytes: fallbackMeter.getGpuBufferBytes() || t.uploadBytes,
+                gpuMemoryBytes:
+                  typeof t.gpuMemoryBytes === 'number' &&
+                  (t.gpuMemoryBytes > 0 || fallbackMeter.getGpuBufferBytes() === 0)
+                    ? t.gpuMemoryBytes
+                    : fallbackMeter.getGpuBufferBytes() || t.uploadBytes,
                 uploadBytes: t.uploadBytes,
                 drapeRedraws: t.drapeRedraws,
-                pendingRequests,
-                totalRequests: requestsCount,
+                pendingRequests:
+                  typeof t.pendingRequests === 'number' ? t.pendingRequests : pendingRequests,
+                totalRequests:
+                  typeof t.totalRequests === 'number'
+                    ? Math.max(t.totalRequests, requestsCount)
+                    : requestsCount,
                 loadedMs,
                 settled: t.settled,
                 camera: currentCamera,
