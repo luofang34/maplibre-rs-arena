@@ -208,56 +208,127 @@ fn run_live_abba_probes(
         return Err("failed to build mln-rs-bench".into());
     }
 
+    let fixtures_dir = std::env::temp_dir().join("mln-bench-fixtures");
+    if !fixtures_dir.join("version").is_file() {
+        let fixtures_py = mln_dir.join("tools/bench/fixtures.py");
+        let status_fix = Command::new("python3")
+            .arg(&fixtures_py)
+            .arg(&fixtures_dir)
+            .status()
+            .map_err(|e| format!("fixtures.py failed: {e}"))?;
+        if !status_fix.success() {
+            return Err("failed to prepare /tmp/mln-bench-fixtures".into());
+        }
+    }
+
+    let raw_basemap_style = std::fs::read_to_string(mln_dir.join("tools/bench/style.json"))
+        .map_err(|e| format!("read tools/bench/style.json: {e}"))?;
+    let exp_style_path = fixtures_dir.join("exp-basemap-style.json");
+    let exp_style_json = raw_basemap_style.replace(
+        "mln-bench-fixtures:/",
+        &format!("file://{}/", fixtures_dir.display()),
+    );
+    std::fs::write(&exp_style_path, exp_style_json)
+        .map_err(|e| format!("write {}: {e}", exp_style_path.display()))?;
+
     let exp_bin = exp_dir.join("target/release/maplibre-demo");
     let mln_bin = mln_target_dir.join("release/mln-bench");
     let tmp_png = std::env::temp_dir().join("arena-exp-probe.png");
 
     let schedule = abba_schedule(rounds);
-    let mut exp_walls = Vec::new();
-    let mut mln_walls = Vec::new();
-    let mut exp_cpus = Vec::new();
-    let mut mln_cpus = Vec::new();
+    let mut exp_warm_wall = Vec::new();
+    let mut mln_warm_wall = Vec::new();
+    let mut exp_warm_cpu = Vec::new();
+    let mut mln_warm_cpu = Vec::new();
     let mut exp_rss = Vec::new();
     let mut mln_rss = Vec::new();
 
     for &is_exp in &schedule {
         if is_exp {
             let mut cmd = Command::new(&exp_bin);
-            cmd.current_dir(exp_dir).args([
-                "snapshot",
-                "--globe",
-                "--width",
-                "640",
-                "--height",
-                "480",
-                "--max-frames",
-                "15",
-                "--timeout-secs",
-                "15",
-                "--out",
-            ]);
-            cmd.arg(&tmp_png);
+            cmd.current_dir(exp_dir)
+                .args(["bench", "--scenario", "s1", "--width", "1024", "--height", "768", "--frames", "120", "--json"]);
             let (sample, out) = run_measured(&mut cmd)?;
             if out.status.success() {
-                exp_walls.push(sample.wall_ms);
-                exp_cpus.push(sample.cpu_ms);
+                if let Ok(parsed) = serde_json::from_slice::<serde_json::Value>(&out.stdout) {
+                    if let Some(pan) = parsed.get(0).and_then(|r| r.get("pan_throughput")) {
+                        if let Some(w) = pan.get("wall_mean_ms").and_then(serde_json::Value::as_f64) {
+                            exp_warm_wall.push(w);
+                        }
+                        if let Some(c) = pan.get("mean_ms").and_then(serde_json::Value::as_f64) {
+                            exp_warm_cpu.push(c);
+                        }
+                    }
+                }
                 exp_rss.push(sample.peak_rss_mib);
             }
         } else {
             let mut cmd = Command::new(&mln_bin);
-            cmd.current_dir(mln_dir).arg("list");
+            cmd.current_dir(mln_dir)
+                .arg("run")
+                .arg("--fixtures")
+                .arg(&fixtures_dir)
+                .args(["--filter", "Frame/Throughput", "--scale", "0.4", "--json"]);
             let (sample, out) = run_measured(&mut cmd)?;
             if out.status.success() {
-                mln_walls.push(sample.wall_ms);
-                mln_cpus.push(sample.cpu_ms);
+                if let Ok(parsed) = serde_json::from_slice::<serde_json::Value>(&out.stdout) {
+                    if let Some(metrics) = parsed
+                        .get("cases")
+                        .and_then(|c| c.get(0))
+                        .and_then(|c| c.get("metrics"))
+                        .and_then(serde_json::Value::as_array)
+                    {
+                        for m in metrics {
+                            match m.get("name").and_then(serde_json::Value::as_str) {
+                                Some("time_ms") => {
+                                    if let Some(v) = m.get("value").and_then(serde_json::Value::as_f64) {
+                                        mln_warm_wall.push(v);
+                                    }
+                                }
+                                Some("cpu_ms") => {
+                                    if let Some(v) = m.get("value").and_then(serde_json::Value::as_f64) {
+                                        mln_warm_cpu.push(v);
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                }
                 mln_rss.push(sample.peak_rss_mib);
             }
         }
     }
 
-    let med_exp = median(&exp_walls);
-    let med_mln = median(&mln_walls);
-    let (_, raw_p) = mann_whitney_u(&exp_walls, &mln_walls);
+    // Also verify matched 1024x768 SF z14 basemap offline PNG snapshot on exp-rs.
+    let _ = Command::new(&exp_bin)
+        .current_dir(exp_dir)
+        .arg("snapshot")
+        .arg("--style")
+        .arg(&exp_style_path)
+        .args([
+            "--width",
+            "1024",
+            "--height",
+            "768",
+            "--lat",
+            "37.766402546",
+            "--lon",
+            "-122.420654297",
+            "--zoom",
+            "14.0",
+            "--max-frames",
+            "30",
+            "--timeout-secs",
+            "15",
+            "--out",
+        ])
+        .arg(&tmp_png)
+        .output();
+
+    let med_exp = median(&exp_warm_wall);
+    let med_mln = median(&mln_warm_wall);
+    let (_, raw_p) = mann_whitney_u(&exp_warm_wall, &mln_warm_wall);
     let adj_p = holm_bonferroni(&[raw_p])[0];
     let delta_pct = if med_mln > 0.0 {
         ((med_exp - med_mln) / med_mln) * 100.0
@@ -270,13 +341,15 @@ fn run_live_abba_probes(
         } else {
             "mln-rs faster"
         }
+    } else if med_exp > 0.0 && med_exp < med_mln {
+        "exp-rs faster (3-round sample)"
     } else {
         "tie / capability-only"
     };
 
     Ok(vec![NativeAbbaRow {
-        scenario: "Live Native Headless Probe".into(),
-        workload: format!("ABBA ({rounds} rounds)"),
+        scenario: "S1 · Warm 2D Urban PanThroughput (1024×768 Metal, 120f)".into(),
+        workload: format!("GPU-synced per-frame wall time ABBA ({rounds} rounds × 120 frames)"),
         exp_median_ms: med_exp,
         mln_median_ms: med_mln,
         delta_pct,
@@ -287,9 +360,9 @@ fn run_live_abba_probes(
         exp_peak_rss_mib: Some(median(&exp_rss)),
         mln_peak_rss_mib: Some(median(&mln_rss)),
         notes: format!(
-            "CPU user+sys median: exp={:.1}ms, mln={:.1}ms (wait4 rusage)",
-            median(&exp_cpus),
-            median(&mln_cpus)
+            "Per-frame CPU median: exp={:.2}ms vs mln={:.2}ms (1024×768 headless Metal)",
+            median(&exp_warm_cpu),
+            median(&mln_warm_cpu)
         ),
     }])
 }

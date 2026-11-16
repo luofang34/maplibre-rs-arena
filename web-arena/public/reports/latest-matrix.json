@@ -1,11 +1,11 @@
 {
-  "generatedAt": "2026-11-15T18:21:21Z",
+  "generatedAt": "2026-11-16T06:57:00Z",
   "commits": {
-    "maplibreRsExperimental": "a66a7f6394",
+    "maplibreRsExperimental": "7b331955bf",
     "mlnRs": "0ca2ff95fb",
     "maplibreGlJs": "5.3.0"
   },
-  "hardwareProfile": "Static Capability Audit on macos aarch64 (pass `--live` to run local GPU ABBA rounds)",
+  "hardwareProfile": "macos aarch64 (3 ABBA rounds)",
   "capabilities": [
     {
       "dimension": "WebGPU Render Pipeline & Concurrency Model",
@@ -73,18 +73,18 @@
   ],
   "nativeAbba": [
     {
-      "scenario": "Live Native Headless Probe",
-      "workload": "ABBA (5 rounds)",
-      "expMedianMs": 114.288125,
-      "mlnMedianMs": 6.484895999999999,
-      "deltaPct": 1662.3740612031409,
-      "mannWhitneyP": 0.0022023577164516084,
-      "verdict": "mln-rs faster",
+      "scenario": "S1 · Warm 2D Urban PanThroughput (1024×768 Metal, 120f)",
+      "workload": "GPU-synced per-frame wall time ABBA (3 rounds × 120 frames)",
+      "expMedianMs": 4.921716966666665,
+      "mlnMedianMs": 5.3725415,
+      "deltaPct": -8.391271306761142,
+      "mannWhitneyP": 0.00507498932528061,
+      "verdict": "exp-rs faster",
       "expMinstr": null,
       "mlnMinstr": null,
-      "expPeakRssMib": 105.703125,
-      "mlnPeakRssMib": 6.765625,
-      "notes": "CPU user+sys median: exp=173.6ms, mln=5.3ms (wait4 rusage)"
+      "expPeakRssMib": 193.6796875,
+      "mlnPeakRssMib": 181.828125,
+      "notes": "Per-frame CPU median: exp=1.17ms vs mln=2.01ms (1024×768 headless Metal)"
     }
   ],
   "conformanceSummary": {

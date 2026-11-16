@@ -51,16 +51,21 @@ export async function executeSoloFlightPair(
     host.onProgress(`Running deterministic solo flight on ${engineId} (${(scenario.durationMs / 1000).toFixed(1)}s)…`);
     const startFlight = performance.now();
     let tick = 0;
+    let rafMainSumMs = 0;
+    let rafMainTicks = 0;
 
     await new Promise<void>((resolve) => {
       const step = () => {
         const elapsed = performance.now() - startFlight;
         const t = Math.min(1, elapsed / scenario.durationMs);
         try {
+          const callT0 = performance.now();
           bridge.jumpTo(scenario.flightPoseAt(t));
           if (scenario.dynamicGeoJsonStress) {
             bridge.stepDynamicStress?.(tick++);
           }
+          rafMainSumMs += performance.now() - callT0;
+          rafMainTicks++;
         } catch {
           resolve();
           return;
@@ -74,9 +79,25 @@ export async function executeSoloFlightPair(
       requestAnimationFrame(step);
     });
 
+    bridge.onTelemetry(null);
+    await bridge.waitIdle(3500);
+    let idleSubmits600ms = 0;
+    const countIdle = () => {
+      idleSubmits600ms++;
+    };
+    bridge.onTelemetry(countIdle);
+    await new Promise((r) => window.setTimeout(r, 600));
     bridge.setTelemetryEnabled(false);
     bridge.onTelemetry(null);
     host.unmountSlot(slot);
+    const win = window as unknown as { __arenaSoloExtra?: unknown[] };
+    win.__arenaSoloExtra ??= [];
+    win.__arenaSoloExtra.unshift({
+      engineId,
+      scenarioCode: scenario.code,
+      rafMainAvgMs: rafMainTicks > 0 ? rafMainSumMs / rafMainTicks : 0,
+      idleSubmits600ms,
+    });
 
     const cpus = samples.map((s) => s.cpuTotalMs).sort((a, b) => a - b);
     const intervals = samples.map((s) => s.frameIntervalMs).sort((a, b) => a - b);

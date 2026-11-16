@@ -471,7 +471,7 @@ export async function createExpRunner(
   const styleJson = JSON.stringify(styleObj);
 
   let currentCamera: CameraPose = { ...cfg.camera };
-  let followingSilently = false;
+  let followingSilently = true;
   let telemetryEnabled = Boolean(cfg.perfEnabled);
   let loadedMs: number | null = null;
   let lastFrameAt = performance.now();
@@ -534,6 +534,14 @@ export async function createExpRunner(
 
   const hasNativeTelemetry = typeof map.setArenaTelemetryListener === 'function';
 
+  const clearSilentFollowOnUserInput = () => {
+    followingSilently = false;
+  };
+  canvas.addEventListener('pointerdown', clearSilentFollowOnUserInput);
+  canvas.addEventListener('wheel', clearSilentFollowOnUserInput, { passive: true });
+  canvas.addEventListener('keydown', clearSilentFollowOnUserInput);
+  canvas.addEventListener('touchstart', clearSilentFollowOnUserInput, { passive: true });
+
   if (typeof map.setArenaCameraListener === 'function') {
     map.setArenaCameraListener((cam) => {
       currentCamera = {
@@ -546,7 +554,6 @@ export async function createExpRunner(
       if (!followingSilently) {
         cameraCb?.(currentCamera);
       }
-      followingSilently = false;
     });
   } else {
     let interacting = false;
@@ -600,14 +607,22 @@ export async function createExpRunner(
       let sumWbCalls = 0;
       let sumWbBytes = 0;
       let sumPhaseSortMs = 0;
+      let sumRequestMs = 0;
+      let maxGpuBytes = 0;
+      let maxWasmBytes = 0;
       for (const f of frames) {
         sumPasses += f.passes ?? 0;
         sumSetVb += f.setVertexBuffers ?? 0;
         sumWbCalls += f.writeBufferCalls ?? 0;
         sumWbBytes += f.writeBufferBytes ?? 0;
+        maxGpuBytes = Math.max(maxGpuBytes, f.gpuMemoryBytes ?? 0);
+        maxWasmBytes = Math.max(maxWasmBytes, f.wasmMemoryBytes ?? 0);
         for (const st of f.stages) {
           if (/phasesort|collision/i.test(st.name)) {
             sumPhaseSortMs += st.ms;
+          }
+          if (/^request$/i.test(st.name)) {
+            sumRequestMs += st.ms;
           }
         }
       }
@@ -619,11 +634,15 @@ export async function createExpRunner(
             engineId: cfg.engineId,
             scenario: new URLSearchParams(location.search).get('scenario') ?? '',
             frames: n,
+            reportedLoadedMs: loadedMs,
             avgPasses: sumPasses / n,
             avgSetVertexBuf: sumSetVb / n,
             avgWriteBufCalls: sumWbCalls / n,
             avgWriteBufKiB: sumWbBytes / n / 1024,
             avgPhaseSortMs: sumPhaseSortMs / n,
+            avgRequestMs: sumRequestMs / n,
+            peakGpuMiB: maxGpuBytes / (1024 * 1024),
+            peakWasmMiB: maxWasmBytes / (1024 * 1024),
           });
         }
       } catch {

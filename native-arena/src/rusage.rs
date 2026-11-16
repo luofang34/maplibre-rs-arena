@@ -2,6 +2,7 @@ use std::process::Command;
 use std::time::Instant;
 
 #[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
 pub struct ProcessSample {
     pub wall_ms: f64,
     pub cpu_ms: f64,

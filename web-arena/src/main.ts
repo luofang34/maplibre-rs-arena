@@ -248,13 +248,21 @@ async function main() {
         },
         { capture: true },
       );
+      doc?.addEventListener(
+        'touchstart',
+        () => {
+          leader = slot;
+          const other = slot === 'left' ? bridgeRight : bridgeLeft;
+          other?.stop();
+        },
+        { capture: true, passive: true },
+      );
     } catch {
       // ignore if iframe unloaded mid-attach
     }
 
     bridge.onCameraChange((pose) => {
       if (soloRunning) return;
-      if (leader === null) leader = slot;
       if (leader !== slot) return;
       currentCamera = pose;
       updateHudCameraText(pose);
@@ -550,6 +558,7 @@ async function main() {
         activeScenario,
       );
       liveSoloRuns.unshift(runA, runB);
+      (window as unknown as { __liveSoloRuns?: SoloRunMetrics[] }).__liveSoloRuns = liveSoloRuns;
       refreshMatrixDialog();
       if (!matrixDialog.open) matrixDialog.showModal();
     } finally {
