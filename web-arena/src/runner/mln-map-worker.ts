@@ -1,4 +1,7 @@
 import type { FromMlnWorker, MlnCameraTuple, MlnInput, MlnStartMessage, ToMlnWorker } from './mln-protocol';
+import { ensureMlnWebGpuCompat } from './mln-webgpu-compat';
+
+ensureMlnWebGpuCompat();
 
 interface MlnWebMapInstance {
   set_style_url(url: string): void;
@@ -7,14 +10,19 @@ interface MlnWebMapInstance {
   set_globe_free_bearing(on: boolean): void;
   resize(width: number, height: number): void;
   set_pixel_ratio(ratio: number): void;
-  frame(maxMs: number, now: number): boolean;
+  /** Legacy `0ca2ff95fb` signature: `frame(maxMs, now)`; newer `18af76217b+` signature: `frame(now)`. */
+  frame(...args: number[]): boolean;
+  /** Present on newer `18af76217b+` session-based `WebMap` builds. */
+  drain_frames?: () => number;
   frame_timings(): Float64Array | number[];
   render_stats(): Uint32Array | Float64Array | number[];
   camera(): Float64Array | number[];
   is_fully_loaded(): boolean;
-  received(): number;
+  /** Present on `0ca2ff95fb` baseline builds. */
+  received?: () => number;
   request_pixels(): void;
-  take_pixels(): Uint8Array | undefined;
+  /** Present on `0ca2ff95fb` baseline builds. */
+  take_pixels?: () => Uint8Array | undefined;
   pointer_down(id: number, pointerType: string, button: number, x: number, y: number, modifiers: number, time: number): void;
   pointer_move(id: number, x: number, y: number, time: number): void;
   pointer_up(id: number, x: number, y: number, time: number): void;
@@ -27,17 +35,13 @@ interface MlnWebMapInstance {
 interface MlnWebBindings {
   default: (opts: { module_or_path: WebAssembly.Module }) => Promise<{ memory?: WebAssembly.Memory }>;
   WebMap: {
-    create(
-      canvas: OffscreenCanvas,
-      width: number,
-      height: number,
-      ratio: number,
-      ports: MessagePort[],
-      onFatal: (instance: number, msg: unknown) => void,
-      loadShaper: () => Promise<unknown>,
-      localIdeographFontFamily?: string,
-    ): Promise<MlnWebMapInstance>;
+    prototype?: {
+      drain_frames?: () => number;
+    };
+    create(...args: unknown[]): Promise<MlnWebMapInstance>;
   };
+  mlnWebConfigureTileWorkers?: (count?: number | null, spawn?: (() => MessagePort | undefined) | null) => void;
+  set_preloads?: (take: (url: string) => Promise<Response> | undefined) => void;
   mlnWebStopPump: () => void;
 }
 
@@ -107,7 +111,22 @@ self.onmessage = ({ data }: MessageEvent<ToMlnWorker>) => {
   }
 };
 
+function normalizeFramePhases(raw: ArrayLike<number>): number[] {
+  const arr = Array.from(raw, (v) => Number(v ?? 0));
+  if (arr.length >= 8) {
+    return arr.slice(0, 8);
+  }
+  if (arr.length === 6) {
+    // Newer 6-phase layout `[sources, layers, symbols, upload, draw, tasks]` ->
+    // canonical 8-slot `[map, tiles, sources, symbols, layers, upload, draw, tasks]`.
+    return [0, 0, arr[0] ?? 0, arr[2] ?? 0, arr[1] ?? 0, arr[3] ?? 0, arr[4] ?? 0, arr[5] ?? 0];
+  }
+  while (arr.length < 8) arr.push(0);
+  return arr;
+}
+
 async function startWorker(cfg: MlnStartMessage): Promise<(msg: ToMlnWorker) => void> {
+  ensureMlnWebGpuCompat();
   const webgl2 = cfg.backend === 'webgl2';
   const jsUrl = webgl2 ? `${cfg.origin}/wasm/mln/pkg/webgl/mln_web.js` : `${cfg.origin}/wasm/mln/pkg/mln_web.js`;
   const shaperUrl = `${cfg.origin}/wasm/mln/pkg/mln_web_shaper.js`;
@@ -116,30 +135,82 @@ async function startWorker(cfg: MlnStartMessage): Promise<(msg: ToMlnWorker) => 
   const wasmExports = await bindings.default({ module_or_path: cfg.module });
   stopPump = bindings.mlnWebStopPump;
 
+  const isSessionAbi = typeof bindings.WebMap?.prototype?.drain_frames === 'function';
+
   const loadShaper = async () => {
     const shaper = (await import(/* @vite-ignore */ shaperUrl)) as { default: () => Promise<unknown> };
     await shaper.default();
     return shaper;
   };
 
+  let workerReplies = 0;
+  let readPixelsCount = 0;
+  let renderingMap: MlnWebMapInstance | undefined;
+
+  if (isSessionAbi) {
+    bindings.set_preloads?.(() => undefined);
+    cfg.ports.forEach((control, idx) => {
+      control.onmessage = ({ data }: MessageEvent<{ fatal?: string; replies?: number }>) => {
+        if (data && typeof data === 'object') {
+          if (typeof data.fatal === 'string') {
+            fatal(`tile worker ${idx}`, data.fatal);
+          } else if (typeof data.replies === 'number') {
+            workerReplies += data.replies;
+          }
+        }
+      };
+    });
+    let spawned = 0;
+    bindings.mlnWebConfigureTileWorkers?.(cfg.ports.length, () => cfg.ports[spawned++]);
+  }
+
+  const onSessionFrame = () => {
+    if (stopped || !renderingMap?.drain_frames) return;
+    try {
+      if (renderingMap.drain_frames() === 0 || readPixelsCount === 0) return;
+      const pixels = copyCanvasPixels(cfg.canvas);
+      if (pixels !== undefined) {
+        readPixelsCount--;
+        post({ type: 'pixels', width: cfg.canvas.width, height: cfg.canvas.height, pixels }, [pixels.buffer]);
+        if (readPixelsCount > 0) renderingMap.request_pixels();
+      }
+    } catch (err) {
+      fatal('map', err);
+    }
+  };
+
   let map: MlnWebMapInstance;
   try {
-    map = await bindings.WebMap.create(
-      cfg.canvas,
-      cfg.width,
-      cfg.height,
-      cfg.ratio,
-      cfg.ports,
-      (idx, msg) => fatal(`tile worker ${idx}`, msg),
-      loadShaper,
-      'sans-serif',
-    );
+    if (isSessionAbi) {
+      map = await bindings.WebMap.create(
+        cfg.canvas,
+        cfg.width,
+        cfg.height,
+        cfg.ratio,
+        loadShaper,
+        null,
+        true,
+        onSessionFrame,
+      );
+    } else {
+      map = await bindings.WebMap.create(
+        cfg.canvas,
+        cfg.width,
+        cfg.height,
+        cfg.ratio,
+        cfg.ports,
+        (idx: number, msg: unknown) => fatal(`tile worker ${idx}`, msg),
+        loadShaper,
+        'sans-serif',
+      );
+    }
   } catch (err) {
     if ((self as unknown as { mlnPanic?: string }).mlnPanic !== undefined) throw err;
     stopped = true;
     post({ type: 'unsupported', message: err instanceof Error ? err.message : String(err) });
     return () => {};
   }
+  renderingMap = map;
 
   map.set_globe_free_bearing(cfg.globeFreeBearing);
   map.set_style_url(cfg.style);
@@ -148,7 +219,6 @@ async function startWorker(cfg: MlnStartMessage): Promise<(msg: ToMlnWorker) => 
   let startedAt = performance.now();
   let loadedMs: number | null = null;
   let debugOn = false;
-  let readPixelsCount = 0;
   let idleWaiters = 0;
   let stillFrames = 0;
   let lastCameraKey = '';
@@ -177,14 +247,15 @@ async function startWorker(cfg: MlnStartMessage): Promise<(msg: ToMlnWorker) => 
   const tick = (rafTime: number) => {
     if (stopped) return;
     try {
-      const drew = map.frame(8, performance.now());
+      const now = performance.now();
+      const drew = isSessionAbi ? map.frame(now) : map.frame(8, now);
       if (drew) {
         if (debugOn && lastDrawnAt !== null) {
           post({
             type: 'frame',
             sample: {
               interval: rafTime - lastDrawnAt,
-              phases: Array.from(map.frame_timings()),
+              phases: normalizeFramePhases(map.frame_timings()),
             },
           });
         }
@@ -217,12 +288,13 @@ async function startWorker(cfg: MlnStartMessage): Promise<(msg: ToMlnWorker) => 
 
       if (loadedMs === null && map.is_fully_loaded()) {
         loadedMs = performance.now() - startedAt;
-        post({ type: 'loaded', loadedMs, replies: map.received() });
+        const replies = typeof map.received === 'function' ? map.received() : workerReplies;
+        post({ type: 'loaded', loadedMs, replies });
         emitStats(true);
       }
 
-      if (readPixelsCount > 0) {
-        const pixels = webgl2 ? copyWebGlPixels(cfg.canvas) : map.take_pixels();
+      if (!isSessionAbi && readPixelsCount > 0) {
+        const pixels = webgl2 ? copyCanvasPixels(cfg.canvas) : map.take_pixels?.();
         if (pixels !== undefined) {
           readPixelsCount--;
           post({ type: 'pixels', width: cfg.canvas.width, height: cfg.canvas.height, pixels }, [pixels.buffer]);
@@ -293,7 +365,7 @@ async function startWorker(cfg: MlnStartMessage): Promise<(msg: ToMlnWorker) => 
   return handle;
 }
 
-function copyWebGlPixels(canvas: OffscreenCanvas): Uint8Array | undefined {
+function copyCanvasPixels(canvas: OffscreenCanvas): Uint8Array | undefined {
   const ctx = new OffscreenCanvas(canvas.width, canvas.height).getContext('2d');
   if (!ctx) return undefined;
   ctx.drawImage(canvas, 0, 0);
