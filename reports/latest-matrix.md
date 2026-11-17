@@ -1,7 +1,7 @@
 # MapLibre Rust Arena — Latest Matrix Report
 
-- **Generated At**: `2026-11-17T09:06:07Z`
-- **`maplibre-rs-experimental` rev**: `698bd9ca8e`
+- **Generated At**: `2026-11-17T09:42:35Z`
+- **`maplibre-rs-experimental` rev**: `4ab32e9cce`
 - **`mln-rs` rev**: `0ca2ff95fb`
 - **Hardware Profile**: macos aarch64 (5 ABBA rounds)
 
@@ -21,7 +21,7 @@
 
 | Scenario | Workload | `exp-rs` Median (ms) | `mln-rs` Median (ms) | Mann-Whitney p | Verdict | Notes |
 | :--- | :--- | ---: | ---: | ---: | :--- | :--- |
-| S1 · Warm 2D Urban PanThroughput (1024×768 Metal, 120f) | GPU-synced per-frame wall time ABBA (5 rounds × 120 frames) | 2.58 | 3.72 | 0.001 | **exp-rs faster** | CPU median: exp=0.85ms vs mln=2.08ms | RSS: exp=175.0 MiB vs mln=178.3 MiB | cold_first_frame=140.3ms |
-| S3 · Dense CJK Tokyo (1024×768 Metal, 120f) | Local CJK glyph rasterization + PanThroughput | 2.86 | Unsupported | — | **exp-rs native probe** | CPU mean=0.99ms | cold=182.3ms | idle_redraws=0 | Unpaired on native fixtures |
-| S4 · Globe Polar Overview (1024×768 Metal, 120f) | Spherical globe mesh + PanThroughput | 1.25 | Unsupported | — | **exp-rs native probe** | CPU mean=0.26ms | cold=64.0ms | idle_redraws=0 | Unpaired on native fixtures |
-| S5 · 3D DEM Terrain Innsbruck (1024×768 Metal, 120f) | 3D DEM mesh + DrapeCache + PanThroughput | 1.79 | Unsupported | — | **exp-rs exclusive (terrain 3D)** | CPU mean=0.85ms | cold=837.4ms | idle_redraws=0 | Unsupported in mln-rs (2D hillshade only) |
+| S1 · Warm 2D Urban PanThroughput (1024×768 Metal, 120f) | GPU-synced per-frame wall time ABBA (5 rounds × 120 frames) | 2.78 | 3.72 | 0.273 | **exp-rs faster** | CPU median: exp=0.81ms vs mln=1.95ms | RSS: exp=175.2 MiB vs mln=178.3 MiB | cold_first_frame=139.2ms |
+| S3 · Dense CJK Tokyo (1024×768 Metal, 120f) | Local CJK glyph rasterization + PanThroughput | 1.89 | Unsupported | — | **exp-rs native probe** | CPU mean=0.78ms | cold=187.6ms | idle_redraws=0 | Unpaired on native fixtures |
+| S4 · Globe Polar Overview (1024×768 Metal, 120f) | Spherical globe mesh + PanThroughput | 1.02 | Unsupported | — | **exp-rs native probe** | CPU mean=0.18ms | cold=63.3ms | idle_redraws=0 | Unpaired on native fixtures |
+| S5 · 3D DEM Terrain Innsbruck (1024×768 Metal, 120f) | 3D DEM mesh + DrapeCache + PanThroughput | 1.05 | Unsupported | — | **exp-rs exclusive (terrain 3D)** | CPU mean=0.63ms | cold=127.4ms | idle_redraws=0 | Unsupported in mln-rs (2D hillshade only) |
