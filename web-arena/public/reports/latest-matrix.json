@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-11-17T09:42:35Z",
+  "generatedAt": "2026-11-17T11:52:31Z",
   "commits": {
-    "maplibreRsExperimental": "4ab32e9cce",
+    "maplibreRsExperimental": "68f5b1158b",
     "mlnRs": "0ca2ff95fb",
     "maplibreGlJs": "5.3.0"
   },
@@ -75,58 +75,58 @@
     {
       "scenario": "S1 · Warm 2D Urban PanThroughput (1024×768 Metal, 120f)",
       "workload": "GPU-synced per-frame wall time ABBA (5 rounds × 120 frames)",
-      "expMedianMs": 2.777228308333333,
-      "mlnMedianMs": 3.7220102500000003,
-      "deltaPct": -25.383646959775756,
-      "mannWhitneyP": 0.27303642603551204,
+      "expMedianMs": 2.5687696208333337,
+      "mlnMedianMs": 2.581396,
+      "deltaPct": -0.4891298803696175,
+      "mannWhitneyP": 0.34470419833509114,
       "verdict": "exp-rs faster",
       "expMinstr": null,
       "mlnMinstr": null,
-      "expPeakRssMib": 175.15625,
-      "mlnPeakRssMib": 178.34375,
-      "notes": "CPU median: exp=0.81ms vs mln=1.95ms | RSS: exp=175.2 MiB vs mln=178.3 MiB | cold_first_frame=139.2ms"
+      "expPeakRssMib": 165.6796875,
+      "mlnPeakRssMib": 184.15625,
+      "notes": "CPU median: exp=0.74ms vs mln=1.38ms | RSS: exp=165.7 MiB vs mln=184.2 MiB | cold_first_frame=136.1ms"
     },
     {
       "scenario": "S3 · Dense CJK Tokyo (1024×768 Metal, 120f)",
       "workload": "Local CJK glyph rasterization + PanThroughput",
-      "expMedianMs": 1.893829133333334,
+      "expMedianMs": 2.519339608333333,
       "mlnMedianMs": 0,
       "deltaPct": 0,
       "mannWhitneyP": 1,
       "verdict": "exp-rs native probe",
       "expMinstr": null,
       "mlnMinstr": null,
-      "expPeakRssMib": 227.609375,
+      "expPeakRssMib": 226.515625,
       "mlnPeakRssMib": null,
-      "notes": "CPU mean=0.78ms | cold=187.6ms | idle_redraws=0 | Unpaired on native fixtures"
+      "notes": "CPU mean=0.76ms | cold=173.5ms | idle_redraws=0 | Unpaired on native fixtures"
     },
     {
       "scenario": "S4 · Globe Polar Overview (1024×768 Metal, 120f)",
       "workload": "Spherical globe mesh + PanThroughput",
-      "expMedianMs": 1.0202597333333332,
+      "expMedianMs": 1.0265988916666664,
       "mlnMedianMs": 0,
       "deltaPct": 0,
       "mannWhitneyP": 1,
       "verdict": "exp-rs native probe",
       "expMinstr": null,
       "mlnMinstr": null,
-      "expPeakRssMib": 115.875,
+      "expPeakRssMib": 105.9375,
       "mlnPeakRssMib": null,
-      "notes": "CPU mean=0.18ms | cold=63.3ms | idle_redraws=0 | Unpaired on native fixtures"
+      "notes": "CPU mean=0.18ms | cold=62.1ms | idle_redraws=0 | Unpaired on native fixtures"
     },
     {
       "scenario": "S5 · 3D DEM Terrain Innsbruck (1024×768 Metal, 120f)",
       "workload": "3D DEM mesh + DrapeCache + PanThroughput",
-      "expMedianMs": 1.0502962666666673,
+      "expMedianMs": 1.7148749833333332,
       "mlnMedianMs": 0,
       "deltaPct": 0,
       "mannWhitneyP": 1,
       "verdict": "exp-rs exclusive (terrain 3D)",
       "expMinstr": null,
       "mlnMinstr": null,
-      "expPeakRssMib": 209.59375,
+      "expPeakRssMib": 219.796875,
       "mlnPeakRssMib": null,
-      "notes": "CPU mean=0.63ms | cold=127.4ms | idle_redraws=0 | Unsupported in mln-rs (2D hillshade only)"
+      "notes": "CPU mean=0.73ms | cold=152.9ms | idle_redraws=0 | Unsupported in mln-rs (2D hillshade only)"
     }
   ],
   "conformanceSummary": {
