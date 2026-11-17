@@ -60,7 +60,7 @@ interface ExpModuleExports {
   startMapLibre(
     wasmPath: string | WebAssembly.Module | Promise<WebAssembly.Module> | undefined,
     workerPath: string | undefined,
-    styleJson?: string,
+    styleJson?: string | Promise<string | undefined>,
     imageProviderModules?: string[],
     canvasId?: string,
     options?: {
@@ -455,13 +455,22 @@ export async function createExpRunner(
   const resolvedStyleUrl = new URL(cfg.styleUrl, location.origin).href;
   const wasmModulePromise = compileWasmOnce(wasmUrl);
   const workerWasmPromise = !isMt ? compileWasmOnce(workerWasmUrl) : undefined;
-  let styleResp: Response;
+  const styleJsonPromise: Promise<string> = rawWindowFetch(resolvedStyleUrl).then(async (styleResp) => {
+    if (!styleResp.ok) {
+      throw new Error(`HTTP ${styleResp.status} fetching ${resolvedStyleUrl}`);
+    }
+    const styleObj = (await styleResp.json()) as Record<string, unknown>;
+    styleObj.center = [cfg.camera.lng + eyeOffset, cfg.camera.lat];
+    styleObj.zoom = cfg.camera.zoom;
+    styleObj.bearing = cfg.camera.bearing;
+    styleObj.pitch = cfg.camera.pitch;
+    return JSON.stringify(styleObj);
+  });
+  styleJsonPromise.catch(() => {});
+
   let expMod: ExpModuleExports;
   try {
-    [styleResp, expMod] = await Promise.all([
-      rawWindowFetch(resolvedStyleUrl),
-      import(/* @vite-ignore */ moduleJsUrl) as Promise<ExpModuleExports>,
-    ]);
+    expMod = (await import(/* @vite-ignore */ moduleJsUrl)) as ExpModuleExports;
   } catch (err) {
     activeFetchTrackers.delete(fetchTracker);
     emitStatus({
@@ -471,18 +480,15 @@ export async function createExpRunner(
     return makeFallbackBridge(cfg, 'WASM Not Built');
   }
 
-  const styleObj = (await styleResp.json()) as Record<string, unknown>;
-  styleObj.center = [cfg.camera.lng + eyeOffset, cfg.camera.lat];
-  styleObj.zoom = cfg.camera.zoom;
-  styleObj.bearing = cfg.camera.bearing;
-  styleObj.pitch = cfg.camera.pitch;
-  const styleJson = JSON.stringify(styleObj);
-
   let currentCamera: CameraPose = { ...cfg.camera };
   let followingSilently = true;
   let telemetryEnabled = Boolean(cfg.perfEnabled);
   let loadedMs: number | null = null;
+  let bootStart = performance.now();
   let lastFrameAt = performance.now();
+  let map: ExpMapInstance | undefined;
+  let hasNativeTelemetry = false;
+  let destroyed = false;
 
   let resolveReady: (v: { loadedMs: number }) => void = () => {};
   const ready = new Promise<{ loadedMs: number }>((resolve) => {
@@ -523,88 +529,6 @@ export async function createExpRunner(
   });
 
   emitStatus({ state: 'loading', message: 'Initializing wgpu device & rendering pipeline…' });
-
-  let map: Awaited<ReturnType<ExpModuleExports['startMapLibre']>>;
-  try {
-    map = await expMod.startMapLibre(wasmModulePromise, undefined, styleJson, [], canvas.id, {
-      workerWasmPath: workerWasmPromise,
-      webglModulePath: isMt ? undefined : webglModuleUrl,
-      webglWasmPath: isMt ? undefined : webglWasmUrl,
-    });
-  } catch (err) {
-    activeFetchTrackers.delete(fetchTracker);
-    emitStatus({ state: 'missing-wasm', message: `Failed to instantiate ${wasmUrl}: ${String(err)}` });
-    return makeFallbackBridge(cfg, 'WASM Missing');
-  }
-  if (!map) {
-    activeFetchTrackers.delete(fetchTracker);
-    emitStatus({ state: 'unsupported', message: 'maplibre-rs-experimental failed to initialize WebGPU on this device.' });
-    return makeFallbackBridge(cfg, 'Init Failed');
-  }
-
-  const bootStart = performance.now();
-
-  const hasNativeTelemetry = typeof map.setArenaTelemetryListener === 'function';
-
-  const clearSilentFollowOnUserInput = () => {
-    followingSilently = false;
-  };
-  canvas.addEventListener('pointerdown', clearSilentFollowOnUserInput);
-  canvas.addEventListener('wheel', clearSilentFollowOnUserInput, { passive: true });
-  canvas.addEventListener('keydown', clearSilentFollowOnUserInput);
-  canvas.addEventListener('touchstart', clearSilentFollowOnUserInput, { passive: true });
-
-  if (typeof map.setArenaCameraListener === 'function') {
-    map.setArenaCameraListener((cam) => {
-      currentCamera = {
-        lng: cam.center[0] - eyeOffset,
-        lat: cam.center[1],
-        zoom: cam.zoom,
-        bearing: cam.bearing,
-        pitch: cam.pitch,
-      };
-      if (!followingSilently) {
-        cameraCb?.(currentCamera);
-      }
-    });
-  } else {
-    let interacting = false;
-    const poll = async () => {
-      if (!interacting) return;
-      try {
-        const cam = await map.getCamera();
-        currentCamera = {
-          lng: cam.center[0] - eyeOffset,
-          lat: cam.center[1],
-          zoom: cam.zoom,
-          bearing: cam.bearing,
-          pitch: cam.pitch,
-        };
-        if (!followingSilently) cameraCb?.(currentCamera);
-      } catch {
-        // ignore transient poll failures
-      }
-      if (interacting) requestAnimationFrame(() => void poll());
-    };
-    canvas.addEventListener('pointerdown', () => {
-      interacting = true;
-      void poll();
-    });
-    window.addEventListener('pointerup', () => {
-      window.setTimeout(() => {
-        interacting = false;
-      }, 600);
-    });
-    canvas.addEventListener('wheel', () => {
-      if (!interacting) {
-        interacting = true;
-        void poll();
-        window.setTimeout(() => {
-          interacting = false;
-        }, 500);
-      }
-    });
-  }
 
   const wireTelemetry = (enabled: boolean) => {
     const win = window as unknown as {
@@ -665,6 +589,7 @@ export async function createExpRunner(
     if (enabled) {
       win.__expTelemetryFrames = [];
     }
+    if (!map) return;
     if (hasNativeTelemetry) {
       map.setArenaTelemetryListener?.(
         enabled
@@ -720,19 +645,108 @@ export async function createExpRunner(
     }
   };
 
-  wireTelemetry(telemetryEnabled);
+  const attachMapListeners = (startedMap: ExpMapInstance) => {
+    hasNativeTelemetry = typeof startedMap.setArenaTelemetryListener === 'function';
+    const clearSilentFollowOnUserInput = () => {
+      followingSilently = false;
+    };
+    canvas.addEventListener('pointerdown', clearSilentFollowOnUserInput);
+    canvas.addEventListener('wheel', clearSilentFollowOnUserInput, { passive: true });
+    canvas.addEventListener('keydown', clearSilentFollowOnUserInput);
+    canvas.addEventListener('touchstart', clearSilentFollowOnUserInput, { passive: true });
 
-  let destroyed = false;
+    if (typeof startedMap.setArenaCameraListener === 'function') {
+      startedMap.setArenaCameraListener((cam) => {
+        currentCamera = {
+          lng: cam.center[0] - eyeOffset,
+          lat: cam.center[1],
+          zoom: cam.zoom,
+          bearing: cam.bearing,
+          pitch: cam.pitch,
+        };
+        if (!followingSilently) {
+          cameraCb?.(currentCamera);
+        }
+      });
+    } else {
+      let interacting = false;
+      const poll = async () => {
+        if (!interacting || destroyed) return;
+        try {
+          const cam = await startedMap.getCamera();
+          currentCamera = {
+            lng: cam.center[0] - eyeOffset,
+            lat: cam.center[1],
+            zoom: cam.zoom,
+            bearing: cam.bearing,
+            pitch: cam.pitch,
+          };
+          if (!followingSilently) cameraCb?.(currentCamera);
+        } catch {
+          // ignore transient poll failures
+        }
+        if (interacting && !destroyed) requestAnimationFrame(() => void poll());
+      };
+      canvas.addEventListener('pointerdown', () => {
+        interacting = true;
+        void poll();
+      });
+      window.addEventListener('pointerup', () => {
+        window.setTimeout(() => {
+          interacting = false;
+        }, 600);
+      });
+      canvas.addEventListener('wheel', () => {
+        if (!interacting) {
+          interacting = true;
+          void poll();
+          window.setTimeout(() => {
+            interacting = false;
+          }, 500);
+        }
+      });
+    }
+    wireTelemetry(telemetryEnabled);
+  };
 
-  void (async () => {
+  const mapReady: Promise<ExpMapInstance | undefined> = (async () => {
+    let startedMap: ExpMapInstance | undefined;
     try {
-      if (typeof map.waitArenaLoaded === 'function') {
-        await map.waitArenaLoaded();
-      } else if (typeof map.waitArenaIdle === 'function') {
-        await map.waitArenaIdle();
+      startedMap = await expMod.startMapLibre(wasmModulePromise, undefined, styleJsonPromise, [], canvas.id, {
+        workerWasmPath: workerWasmPromise,
+        webglModulePath: isMt ? undefined : webglModuleUrl,
+        webglWasmPath: isMt ? undefined : webglWasmUrl,
+      });
+    } catch (err) {
+      activeFetchTrackers.delete(fetchTracker);
+      emitStatus({ state: 'missing-wasm', message: `Failed to instantiate ${wasmUrl}: ${String(err)}` });
+      resolveReady({ loadedMs: 0 });
+      return undefined;
+    }
+    if (destroyed) {
+      startedMap?.destroy?.();
+      resolveReady({ loadedMs: 0 });
+      return undefined;
+    }
+    if (!startedMap) {
+      activeFetchTrackers.delete(fetchTracker);
+      emitStatus({
+        state: 'unsupported',
+        message: 'maplibre-rs-experimental failed to initialize WebGPU on this device.',
+      });
+      resolveReady({ loadedMs: 0 });
+      return undefined;
+    }
+    bootStart = performance.now();
+    map = startedMap;
+    attachMapListeners(startedMap);
+    try {
+      if (typeof startedMap.waitArenaLoaded === 'function') {
+        await startedMap.waitArenaLoaded();
+      } else if (typeof startedMap.waitArenaIdle === 'function') {
+        await startedMap.waitArenaIdle();
       } else {
-        await map.getCamera();
-        // Wait briefly for initial network tiles to settle on cold start
+        await startedMap.getCamera();
         const deadline = performance.now() + 4000;
         while (!destroyed && pendingRequests > 0 && performance.now() < deadline) {
           await new Promise((r) => window.setTimeout(r, 80));
@@ -746,44 +760,41 @@ export async function createExpRunner(
       emitStatus({ state: 'ready', message: `Loaded in ${Math.round(loadedMs)} ms`, loadedMs });
       resolveReady({ loadedMs });
     }
+    return startedMap;
   })();
+
+  const sendJump = (pose: CameraPose) => {
+    if (destroyed) return;
+    currentCamera = { ...pose };
+    followingSilently = true;
+    const opts = {
+      center: [pose.lng + eyeOffset, pose.lat] as [number, number],
+      zoom: pose.zoom,
+      bearing: pose.bearing,
+      pitch: pose.pitch,
+      roll: pose.roll,
+    };
+    if (map) {
+      void map.jumpTo(opts).catch(() => {});
+    } else {
+      void mapReady.then((m) => (m && !destroyed ? m.jumpTo(opts).catch(() => {}) : undefined));
+    }
+  };
 
   return {
     engineId: cfg.engineId,
     backendLabel: isMt ? 'exp-rs WebGPU (MT)' : 'exp-rs WebGPU (ST)',
     ready,
     getCamera: () => currentCamera,
-    followCamera: (pose) => {
-      if (destroyed) return;
-      currentCamera = { ...pose };
-      followingSilently = true;
-      void map
-        .jumpTo({
-          center: [pose.lng + eyeOffset, pose.lat],
-          zoom: pose.zoom,
-          bearing: pose.bearing,
-          pitch: pose.pitch,
-          roll: pose.roll,
-        })
-        .catch(() => {});
-    },
-    jumpTo: (pose) => {
-      if (destroyed) return;
-      currentCamera = { ...pose };
-      followingSilently = true;
-      void map
-        .jumpTo({
-          center: [pose.lng + eyeOffset, pose.lat],
-          zoom: pose.zoom,
-          bearing: pose.bearing,
-          pitch: pose.pitch,
-          roll: pose.roll,
-        })
-        .catch(() => {});
-    },
+    followCamera: sendJump,
+    jumpTo: sendJump,
     stop: () => {
       if (destroyed) return;
-      void map.stop().catch(() => {});
+      if (map) {
+        void map.stop().catch(() => {});
+      } else {
+        void mapReady.then((m) => (m && !destroyed ? m.stop().catch(() => {}) : undefined));
+      }
     },
     setTelemetryEnabled: (enabled) => {
       if (destroyed && enabled) return;
@@ -799,11 +810,12 @@ export async function createExpRunner(
       statusCb = cb;
     },
     waitIdle: async (timeoutMs = 8000) => {
-      if (destroyed) return currentCamera;
-      if (typeof map.waitArenaIdle === 'function') {
+      const m = map ?? (await mapReady);
+      if (!m || destroyed) return currentCamera;
+      if (typeof m.waitArenaIdle === 'function') {
         try {
           const res = await Promise.race([
-            map.waitArenaIdle(),
+            m.waitArenaIdle(),
             new Promise<null>((r) => window.setTimeout(() => r(null), timeoutMs)),
           ]);
           if (res && Array.isArray(res.center)) {
@@ -827,8 +839,9 @@ export async function createExpRunner(
       return currentCamera;
     },
     readPixels: async () => {
-      if (destroyed) return null;
-      await map
+      const m = map ?? (await mapReady);
+      if (!m || destroyed) return null;
+      await m
         .jumpTo({
           center: [currentCamera.lng + eyeOffset, currentCamera.lat],
           zoom: currentCamera.zoom,
@@ -850,15 +863,28 @@ export async function createExpRunner(
     stepDynamicStress: (tick) => {
       if (destroyed) return;
       const data = buildSensorGrid(currentCamera, tick);
-      void map.setGeoJsonData('arena_sensors', data).catch(() => {});
+      if (map) {
+        void map.setGeoJsonData('arena_sensors', data).catch(() => {});
+      } else {
+        void mapReady.then((m) =>
+          m && !destroyed ? m.setGeoJsonData('arena_sensors', data).catch(() => {}) : undefined,
+        );
+      }
     },
     destroy: () => {
       if (destroyed) return;
       destroyed = true;
       activeFetchTrackers.delete(fetchTracker);
       wireTelemetry(false);
-      map.setArenaCameraListener?.(null);
-      map.destroy?.();
+      if (map) {
+        map.setArenaCameraListener?.(null);
+        map.destroy?.();
+      } else {
+        void mapReady.then((m) => {
+          m?.setArenaCameraListener?.(null);
+          m?.destroy?.();
+        });
+      }
     },
   };
 }

@@ -749,7 +749,11 @@ function renderMarkdown(report) {
       );
     }
   }
-  lines.push('');
+  lines.push(
+    '',
+    '> **Methodology Notes:** In **S6**, `mln-webgpu` has no `setGeoJsonData` mutation binding (`stepDynamicStress` is a no-op, rendering 0 animated sensors vs 900 animated sensors updated per frame in `exp-st`/`exp-mt`). In **S7**, XR dual-eye stereo rendering is not implemented in `mln-webgpu`.',
+    '',
+  );
   return lines.join('\n');
 }
 
