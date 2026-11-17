@@ -1,7 +1,7 @@
 # MapLibre Rust Arena — Latest Matrix Report
 
-- **Generated At**: `2026-11-17T02:49:46Z`
-- **`maplibre-rs-experimental` rev**: `b4e677756e`
+- **Generated At**: `2026-11-17T03:20:13Z`
+- **`maplibre-rs-experimental` rev**: `0576c1da29`
 - **`mln-rs` rev**: `0ca2ff95fb`
 - **Hardware Profile**: macos aarch64 (5 ABBA rounds)
 

@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-11-17T02:49:46Z",
+  "generatedAt": "2026-11-17T03:20:13Z",
   "commits": {
-    "maplibreRsExperimental": "b4e677756e",
+    "maplibreRsExperimental": "0576c1da29",
     "mlnRs": "0ca2ff95fb",
     "maplibreGlJs": "5.3.0"
   },
