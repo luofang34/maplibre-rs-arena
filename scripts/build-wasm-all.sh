@@ -93,6 +93,18 @@ if [[ "$ONLY" == "all" || "$ONLY" == "exp" ]]; then
     rm -rf "$OUT_DIR/exp-st" && mkdir -p "$OUT_DIR/exp-st/assets"
     cp dist/esbuild-esm/module.js "$OUT_DIR/exp-st/module.js"
     cp src/wasm/maplibre_bg.wasm "$OUT_DIR/exp-st/assets/maplibre_bg.wasm"
+    if [[ -f src/wasm/maplibre_tile_worker_bg.wasm ]]; then
+      cp src/wasm/maplibre_tile_worker_bg.wasm "$OUT_DIR/exp-st/assets/maplibre_tile_worker_bg.wasm"
+    fi
+
+    # shellcheck disable=SC2086
+    RUSTUP_TOOLCHAIN=nightly node build.mjs $EXTRA_FLAGS --webgl
+    rm -rf "$OUT_DIR/exp-webgl" && mkdir -p "$OUT_DIR/exp-webgl/assets"
+    cp dist/esbuild-esm/module.js "$OUT_DIR/exp-webgl/module.js"
+    cp src/wasm/maplibre_bg.wasm "$OUT_DIR/exp-webgl/assets/maplibre_bg.wasm"
+    if [[ -f src/wasm/maplibre_tile_worker_bg.wasm ]]; then
+      cp src/wasm/maplibre_tile_worker_bg.wasm "$OUT_DIR/exp-webgl/assets/maplibre_tile_worker_bg.wasm"
+    fi
 
     # shellcheck disable=SC2086
     RUSTUP_TOOLCHAIN=nightly node build.mjs $EXTRA_FLAGS --multithreaded
@@ -132,6 +144,8 @@ manifest = {
         "mln-shaper": stats_for("mln/pkg/mln_web_shaper_bg.wasm"),
         "mln-webgl2": stats_for("mln/pkg/webgl/mln_web_bg.wasm"),
         "exp-st": stats_for("exp-st/assets/maplibre_bg.wasm"),
+        "exp-st-worker": stats_for("exp-st/assets/maplibre_tile_worker_bg.wasm"),
+        "exp-webgl2": stats_for("exp-webgl/assets/maplibre_bg.wasm"),
         "exp-mt": stats_for("exp-mt/assets/maplibre_bg.wasm"),
     },
 }

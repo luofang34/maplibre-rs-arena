@@ -58,11 +58,16 @@ interface ExpMapInstance {
 
 interface ExpModuleExports {
   startMapLibre(
-    wasmPath: string | WebAssembly.Module | undefined,
+    wasmPath: string | WebAssembly.Module | Promise<WebAssembly.Module> | undefined,
     workerPath: string | undefined,
     styleJson?: string,
     imageProviderModules?: string[],
     canvasId?: string,
+    options?: {
+      workerWasmPath?: string | WebAssembly.Module | Promise<WebAssembly.Module>;
+      webglModulePath?: string;
+      webglWasmPath?: string | WebAssembly.Module | Promise<WebAssembly.Module>;
+    },
   ): Promise<ExpMapInstance | undefined>;
 }
 
@@ -406,10 +411,10 @@ export async function createExpRunner(
     statusCb?.(s);
   };
 
-  if (!('gpu' in navigator)) {
+  if (!('gpu' in navigator) && isMt) {
     emitStatus({
       state: 'unsupported',
-      message: 'maplibre-rs-experimental requires WebGPU (navigator.gpu). Please use a WebGPU-capable browser.',
+      message: 'exp-mt requires WebGPU (navigator.gpu) and COOP/COEP headers.',
     });
     return makeFallbackBridge(cfg, 'WebGPU Unsupported');
   }
@@ -427,6 +432,9 @@ export async function createExpRunner(
   const buildRev = typeof __ARENA_BUILD_REV__ === 'string' ? __ARENA_BUILD_REV__ : 'dev';
   const moduleJsUrl = new URL(`${variantDir}/module.js?v=${buildRev}`, location.origin).href;
   const wasmUrl = new URL(`${variantDir}/assets/maplibre_bg.wasm?v=${buildRev}`, location.origin).href;
+  const workerWasmUrl = new URL(`${variantDir}/assets/maplibre_tile_worker_bg.wasm?v=${buildRev}`, location.origin).href;
+  const webglModuleUrl = new URL(`/wasm/exp-webgl/module.js?v=${buildRev}`, location.origin).href;
+  const webglWasmUrl = new URL(`/wasm/exp-webgl/assets/maplibre_bg.wasm?v=${buildRev}`, location.origin).href;
 
   emitStatus({ state: 'booting', message: `Checking ${cfg.engineId} WASM & style document…` });
 
@@ -445,14 +453,14 @@ export async function createExpRunner(
   activeFetchTrackers.add(fetchTracker);
 
   const resolvedStyleUrl = new URL(cfg.styleUrl, location.origin).href;
+  const wasmModulePromise = compileWasmOnce(wasmUrl);
+  const workerWasmPromise = !isMt ? compileWasmOnce(workerWasmUrl) : undefined;
   let styleResp: Response;
   let expMod: ExpModuleExports;
-  let wasmModule: WebAssembly.Module;
   try {
-    [styleResp, expMod, wasmModule] = await Promise.all([
+    [styleResp, expMod] = await Promise.all([
       rawWindowFetch(resolvedStyleUrl),
       import(/* @vite-ignore */ moduleJsUrl) as Promise<ExpModuleExports>,
-      compileWasmOnce(wasmUrl),
     ]);
   } catch (err) {
     activeFetchTrackers.delete(fetchTracker);
@@ -518,7 +526,11 @@ export async function createExpRunner(
 
   let map: Awaited<ReturnType<ExpModuleExports['startMapLibre']>>;
   try {
-    map = await expMod.startMapLibre(wasmModule, undefined, styleJson, [], canvas.id);
+    map = await expMod.startMapLibre(wasmModulePromise, undefined, styleJson, [], canvas.id, {
+      workerWasmPath: workerWasmPromise,
+      webglModulePath: isMt ? undefined : webglModuleUrl,
+      webglWasmPath: isMt ? undefined : webglWasmUrl,
+    });
   } catch (err) {
     activeFetchTrackers.delete(fetchTracker);
     emitStatus({ state: 'missing-wasm', message: `Failed to instantiate ${wasmUrl}: ${String(err)}` });

@@ -75,7 +75,24 @@ pub fn git_short_rev(repo_dir: &Path) -> Option<String> {
     Some(String::from_utf8_lossy(&out.stdout).trim().to_string())
 }
 
+pub fn read_existing_report(path: &Path) -> Option<MatrixReport> {
+    let raw = std::fs::read_to_string(path).ok()?;
+    serde_json::from_str(&raw).ok()
+}
+
+pub fn read_exp_render_tests_pass_pct(exp_dir: &Path) -> Option<f64> {
+    let raw = std::fs::read_to_string(exp_dir.join("render-tests/ignores.json")).ok()?;
+    let val: serde_json::Value = serde_json::from_str(&raw).ok()?;
+    let passed = val["baseline"]["passed"].as_f64()?;
+    let total = val["baseline"]["total"].as_f64()?;
+    if total <= 0.0 {
+        return None;
+    }
+    Some(((passed / total) * 10000.0).round() / 100.0)
+}
+
 pub fn inspect_capabilities(exp_dir: &Path, mln_dir: &Path) -> Vec<CapabilityRow> {
+    let exp_has_split_worker = exp_dir.join("crates/web-tile-worker").exists();
     let exp_has_terrain = exp_dir.join("maplibre/src/terrain.rs").exists();
     let mln_style_json = std::fs::read_to_string(mln_dir.join("crates/mln_style/src/style_json.rs"))
         .unwrap_or_default();
@@ -101,7 +118,11 @@ pub fn inspect_capabilities(exp_dir: &Path, mln_dir: &Path) -> Vec<CapabilityRow
             dimension: "WebGPU Render Pipeline & Concurrency Model".into(),
             domain: "Web".into(),
             exp_status: "Full".into(),
-            exp_detail: "wgpu WebGPU (4-worker single-threaded pool and SharedArrayBuffer multithreaded pool with on-arrival event waking)".into(),
+            exp_detail: if exp_has_split_worker {
+                "Split wgpu-free Tile Worker WASM + zero-COOP/COEP single-threaded pool, SharedArrayBuffer multithreaded pool, and automatic WebGL2 fallback".into()
+            } else {
+                "wgpu WebGPU (4-worker single-threaded pool and SharedArrayBuffer multithreaded pool with on-arrival event waking)".into()
+            },
             mln_status: "Full".into(),
             mln_detail: "OffscreenCanvas + dedicated Map Worker + MessageChannel Tile Workers, zero COOP/COEP requirement, built-in WebGL2 fallback".into(),
             gljs_reference: "WebGL2 + Web Worker pool".into(),

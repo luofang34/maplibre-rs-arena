@@ -55,6 +55,7 @@ async function boot() {
     bannerDesc.textContent = status.message;
   };
 
+  (window as unknown as { __arenaBootStartMs?: number }).__arenaBootStartMs = performance.now();
   let bridge;
   if (cfg.engineId === 'exp-mt' || cfg.engineId === 'exp-st') {
     bridge = await createExpRunner(cfg, canvas, updateBanner);
@@ -64,6 +65,13 @@ async function boot() {
     const { createGlJsRunner } = await import('./gljs-runner');
     bridge = await createGlJsRunner(cfg, canvas, glContainer, updateBanner);
   }
+
+  void bridge.ready.then(() => {
+    const win = window as unknown as { __arenaBootStartMs?: number; __arenaE2eLoadedMs?: number };
+    if (typeof win.__arenaBootStartMs === 'number' && typeof win.__arenaE2eLoadedMs !== 'number') {
+      win.__arenaE2eLoadedMs = performance.now() - win.__arenaBootStartMs;
+    }
+  });
 
   window.__arenaRunner = bridge;
   window.parent.postMessage({ type: 'arena-runner-ready', slot: cfg.slot, engineId: cfg.engineId }, location.origin);

@@ -8,8 +8,8 @@ use std::process::{Command, ExitCode};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use inspector::{
-    git_short_rev, inspect_capabilities, render_markdown_summary, Commits, ConformanceSummary,
-    MatrixReport, NativeAbbaRow,
+    git_short_rev, inspect_capabilities, read_existing_report, read_exp_render_tests_pass_pct,
+    render_markdown_summary, Commits, ConformanceSummary, MatrixReport, NativeAbbaRow,
 };
 use rusage::run_measured;
 use stats::{abba_schedule, holm_bonferroni, mann_whitney_u, median};
@@ -78,7 +78,7 @@ fn run_matrix_cmd(args: &[String]) -> Result<(), String> {
         .ok_or("missing arena root")?;
 
     let mut live = false;
-    let mut rounds = 3usize;
+    let mut rounds = 5usize;
     let mut json_out = repo_root.join("web-arena/public/reports/latest-matrix.json");
     let mut md_out = repo_root.join("reports/latest-matrix.md");
 
@@ -119,12 +119,17 @@ fn run_matrix_cmd(args: &[String]) -> Result<(), String> {
         .or_else(|| lock_commits.as_ref().map(|c| c.1.clone()))
         .unwrap_or_else(|| "unknown".into());
 
+    let existing = read_existing_report(&json_out);
     let capabilities = inspect_capabilities(&exp_dir, &mln_dir);
 
     let native_abba = if live && exp_dir.exists() && mln_dir.exists() {
         run_live_abba_probes(&exp_dir, &mln_dir, rounds)?
     } else {
-        default_abba_rows(&json_out)
+        existing
+            .as_ref()
+            .filter(|r| !r.native_abba.is_empty())
+            .map(|r| r.native_abba.clone())
+            .unwrap_or_else(default_abba_rows)
     };
 
     let hw_profile = if live {
@@ -135,12 +140,24 @@ fn run_matrix_cmd(args: &[String]) -> Result<(), String> {
             rounds
         )
     } else {
-        format!(
-            "Static Capability Audit on {} {} (pass `--live` to run local GPU ABBA rounds)",
-            std::env::consts::OS,
-            std::env::consts::ARCH
-        )
+        existing
+            .as_ref()
+            .map(|r| r.hardware_profile.as_str())
+            .filter(|s| !s.is_empty() && !s.starts_with("Static Capability Audit"))
+            .map(str::to_owned)
+            .unwrap_or_else(|| {
+                format!(
+                    "Static Capability Audit on {} {} (pass `--live` to run local GPU ABBA rounds)",
+                    std::env::consts::OS,
+                    std::env::consts::ARCH
+                )
+            })
     };
+
+    let render_tests_exp_pass_pct = read_exp_render_tests_pass_pct(&exp_dir)
+        .or_else(|| existing.as_ref().map(|r| r.conformance_summary.render_tests_exp_pass_pct))
+        .unwrap_or(95.77);
+    let solo_web_runs = existing.map(|r| r.solo_web_runs).unwrap_or_default();
 
     let report = MatrixReport {
         generated_at: iso8601_utc_now(),
@@ -153,7 +170,7 @@ fn run_matrix_cmd(args: &[String]) -> Result<(), String> {
         capabilities,
         native_abba,
         conformance_summary: ConformanceSummary {
-            render_tests_exp_pass_pct: 78.5,
+            render_tests_exp_pass_pct,
             render_tests_mln_pass_pct: 94.2,
             expression_tests_mln_pass_pct: 98.1,
             terrain3d_conformance:
@@ -161,7 +178,7 @@ fn run_matrix_cmd(args: &[String]) -> Result<(), String> {
             xr_stereo_conformance:
                 "maplibre-rs-experimental supports dual-eye asymmetric frusta + StereoReuse; unimplemented in mln-rs".into(),
         },
-        solo_web_runs: Vec::new(),
+        solo_web_runs,
     };
 
     if let Some(parent) = json_out.parent() {
@@ -240,6 +257,7 @@ fn run_live_abba_probes(
     let mut mln_warm_wall = Vec::new();
     let mut exp_warm_cpu = Vec::new();
     let mut mln_warm_cpu = Vec::new();
+    let mut exp_cold_ms = Vec::new();
     let mut exp_rss = Vec::new();
     let mut mln_rss = Vec::new();
 
@@ -251,6 +269,9 @@ fn run_live_abba_probes(
             let (sample, out) = run_measured(&mut cmd)?;
             if out.status.success() {
                 if let Ok(parsed) = serde_json::from_slice::<serde_json::Value>(&out.stdout) {
+                    if let Some(c) = parsed.get(0).and_then(|r| r.get("cold_first_frame_ms")).and_then(serde_json::Value::as_f64) {
+                        exp_cold_ms.push(c);
+                    }
                     if let Some(pan) = parsed.get(0).and_then(|r| r.get("pan_throughput")) {
                         if let Some(w) = pan.get("wall_mean_ms").and_then(serde_json::Value::as_f64) {
                             exp_warm_wall.push(w);
@@ -342,12 +363,12 @@ fn run_live_abba_probes(
             "mln-rs faster"
         }
     } else if med_exp > 0.0 && med_exp < med_mln {
-        "exp-rs faster (3-round sample)"
+        "exp-rs faster"
     } else {
         "tie / capability-only"
     };
 
-    Ok(vec![NativeAbbaRow {
+    let mut rows = vec![NativeAbbaRow {
         scenario: "S1 · Warm 2D Urban PanThroughput (1024×768 Metal, 120f)".into(),
         workload: format!("GPU-synced per-frame wall time ABBA ({rounds} rounds × 120 frames)"),
         exp_median_ms: med_exp,
@@ -360,21 +381,55 @@ fn run_live_abba_probes(
         exp_peak_rss_mib: Some(median(&exp_rss)),
         mln_peak_rss_mib: Some(median(&mln_rss)),
         notes: format!(
-            "Per-frame CPU median: exp={:.2}ms vs mln={:.2}ms (1024×768 headless Metal)",
+            "CPU median: exp={:.2}ms vs mln={:.2}ms | RSS: exp={:.1} MiB vs mln={:.1} MiB | cold_first_frame={:.1}ms",
             median(&exp_warm_cpu),
-            median(&mln_warm_cpu)
+            median(&mln_warm_cpu),
+            median(&exp_rss),
+            median(&mln_rss),
+            median(&exp_cold_ms),
         ),
-    }])
-}
+    }];
 
-fn default_abba_rows(existing_json: &Path) -> Vec<NativeAbbaRow> {
-    if let Ok(raw) = std::fs::read_to_string(existing_json) {
-        if let Ok(parsed) = serde_json::from_str::<MatrixReport>(&raw) {
-            if !parsed.native_abba.is_empty() {
-                return parsed.native_abba;
+    for (arg, label, workload, mln_note) in [
+        ("s3", "S3 · Dense CJK Tokyo (1024×768 Metal, 120f)", "Local CJK glyph rasterization + PanThroughput", "Unpaired on native fixtures"),
+        ("s4", "S4 · Globe Polar Overview (1024×768 Metal, 120f)", "Spherical globe mesh + PanThroughput", "Unpaired on native fixtures"),
+        ("s5", "S5 · 3D DEM Terrain Innsbruck (1024×768 Metal, 120f)", "3D DEM mesh + DrapeCache + PanThroughput", "Unsupported in mln-rs (2D hillshade only)"),
+    ] {
+        let mut cmd = Command::new(&exp_bin);
+        cmd.current_dir(exp_dir)
+            .args(["bench", "--scenario", arg, "--width", "1024", "--height", "768", "--frames", "120", "--json"]);
+        if let Ok((sample, out)) = run_measured(&mut cmd) {
+            if out.status.success() {
+                if let Ok(parsed) = serde_json::from_slice::<serde_json::Value>(&out.stdout) {
+                    if let Some(row0) = parsed.get(0) {
+                        let wall = row0.get("pan_throughput").and_then(|p| p.get("wall_mean_ms")).and_then(serde_json::Value::as_f64).unwrap_or(0.0);
+                        let cpu = row0.get("pan_throughput").and_then(|p| p.get("mean_ms")).and_then(serde_json::Value::as_f64).unwrap_or(0.0);
+                        let cold = row0.get("cold_first_frame_ms").and_then(serde_json::Value::as_f64).unwrap_or(0.0);
+                        let idle = row0.get("idle_redraws").and_then(serde_json::Value::as_u64).unwrap_or(0);
+                        rows.push(NativeAbbaRow {
+                            scenario: label.into(),
+                            workload: workload.into(),
+                            exp_median_ms: wall,
+                            mln_median_ms: 0.0,
+                            delta_pct: 0.0,
+                            mann_whitney_p: 1.0,
+                            verdict: if arg == "s5" { "exp-rs exclusive (terrain 3D)" } else { "exp-rs native probe" }.into(),
+                            exp_minstr: None,
+                            mln_minstr: None,
+                            exp_peak_rss_mib: Some(sample.peak_rss_mib),
+                            mln_peak_rss_mib: None,
+                            notes: format!("CPU mean={cpu:.2}ms | cold={cold:.1}ms | idle_redraws={idle} | {mln_note}"),
+                        });
+                    }
+                }
             }
         }
     }
+
+    Ok(rows)
+}
+
+fn default_abba_rows() -> Vec<NativeAbbaRow> {
     vec![
         NativeAbbaRow {
             scenario: "S1 · 2D Dense Urban (1024×1024 Headless)".into(),

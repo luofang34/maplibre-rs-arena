@@ -31,8 +31,10 @@ pub fn perceptual_rgba_diff(
     let mut mismatched = 0usize;
 
     for (px_a, px_b) in img_a[..expected_len]
-        .chunks_exact(4)
-        .zip(img_b[..expected_len].chunks_exact(4))
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .zip(img_b[..expected_len].as_chunks::<4>().0.iter())
     {
         if px_a == px_b {
             continue;
@@ -99,7 +101,7 @@ fn decode_rgba8_png(path: &Path) -> Result<(u32, u32, Vec<u8>), String> {
         png::ColorType::Rgba => raw,
         png::ColorType::Rgb => {
             let mut out = Vec::with_capacity((info.width * info.height * 4) as usize);
-            for rgb in raw.chunks_exact(3) {
+            for rgb in raw.as_chunks::<3>().0 {
                 out.extend_from_slice(&[rgb[0], rgb[1], rgb[2], 255]);
             }
             out

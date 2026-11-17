@@ -42,6 +42,10 @@ deploy: build-web
 native-bench *ARGS:
     cargo run --manifest-path native-arena/Cargo.toml --release -- {{ARGS}}
 
+# Run 3-round interleaved WebGPU Arena ABBA benchmark suite across S1-S8
+web-bench *ARGS: build-web
+    node scripts/bench-web-abba.mjs {{ARGS}}
+
 # Check native-arena compilation without executing heavy GPU loops
 check-native:
     cargo check --manifest-path native-arena/Cargo.toml
