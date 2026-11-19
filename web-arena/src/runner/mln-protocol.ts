@@ -40,6 +40,7 @@ export interface MlnStartMessage {
 }
 
 export type ToMlnWorker =
+  | { type: 'preload'; style: string; ratio: number; zoom: number }
   | MlnStartMessage
   | { type: 'readPixels' }
   | { type: 'idle' }

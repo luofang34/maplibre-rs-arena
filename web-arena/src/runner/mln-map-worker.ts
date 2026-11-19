@@ -47,6 +47,7 @@ interface MlnWebBindings {
 
 let requests = 0;
 let pending = 0;
+const settlePreload = new WeakMap<Response, () => void>();
 const nativeFetch = globalThis.fetch.bind(globalThis);
 globalThis.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
   requests++;
@@ -66,6 +67,7 @@ globalThis.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
       }
       const origArrayBuffer = res.arrayBuffer.bind(res);
       res.arrayBuffer = () => origArrayBuffer().finally(done);
+      settlePreload.set(res, done);
       return res;
     },
     (err: unknown) => {
@@ -74,6 +76,107 @@ globalThis.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
     },
   );
 };
+
+const preloads = new Map<string, { response: Promise<Response>; expiry: ReturnType<typeof setTimeout> }>();
+
+function takePreload(url: string): Promise<Response> | undefined {
+  const preloaded = preloads.get(url);
+  if (preloaded === undefined) return undefined;
+  preloads.delete(url);
+  clearTimeout(preloaded.expiry);
+  return preloaded.response;
+}
+
+function preloadUrl(url: unknown): Promise<Response> | undefined {
+  if (typeof url !== 'string' || !/^https?:\/\//.test(url) || preloads.has(url)) {
+    return undefined;
+  }
+  const response = fetch(url);
+  response.catch(() => {});
+  response
+    .then((r) =>
+      r
+        .clone()
+        .arrayBuffer()
+        .finally(() => settlePreload.get(r)?.()),
+    )
+    .catch(() => {});
+  const expiry = setTimeout(() => preloads.delete(url), 60_000);
+  preloads.set(url, { response, expiry });
+  return response;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+const DEFAULT_MLN_FONT = ['Open Sans Regular', 'Arial Unicode MS Regular'];
+const STRING_EXPR_OPS = new Set(['get', 'has', 'var', 'feature-state', 'global-state', 'properties']);
+
+function firstFontStacks(style: Record<string, unknown>, zoom: number): Set<string> {
+  const stacks = new Set<string>();
+  for (const layer of Array.isArray(style.layers) ? style.layers : []) {
+    if (!isRecord(layer)) continue;
+    const layout = isRecord(layer.layout) ? layer.layout : {};
+    const shown =
+      layer.type === 'symbol' &&
+      layout.visibility !== 'none' &&
+      (typeof layer.minzoom !== 'number' || zoom >= layer.minzoom) &&
+      (typeof layer.maxzoom !== 'number' || zoom < layer.maxzoom);
+    if (!shown || layout['text-field'] === undefined || layout['text-field'] === '') continue;
+    const font = layout['text-font'];
+    const fonts: unknown =
+      font === undefined ? DEFAULT_MLN_FONT : Array.isArray(font) && font[0] === 'literal' ? font[1] : font;
+    if (!Array.isArray(fonts) || fonts.length === 0) continue;
+    const names = fonts.filter((n: unknown): n is string => typeof n === 'string');
+    if (names.length === fonts.length && !STRING_EXPR_OPS.has(names[0] ?? '')) {
+      stacks.add(names.join(','));
+    }
+  }
+  return stacks;
+}
+
+function percentEncodeFontStack(text: string): string {
+  let encoded = '';
+  for (const byte of new TextEncoder().encode(text)) {
+    const ch = String.fromCharCode(byte);
+    encoded += /[A-Za-z0-9\-_.~]/.test(ch) ? ch : `%${byte.toString(16).padStart(2, '0')}`;
+  }
+  return encoded;
+}
+
+function preloadStyle(url: string, ratio: number, zoom: number): void {
+  preloadUrl(url)
+    ?.then((res): Promise<unknown> | undefined => (res.ok ? res.clone().json() : undefined))
+    .then((style) => {
+      if (!isRecord(style)) return;
+      for (const source of Object.values(isRecord(style.sources) ? style.sources : {})) {
+        if (isRecord(source)) preloadUrl(source.url);
+      }
+      const sprites =
+        typeof style.sprite === 'string'
+          ? [style.sprite]
+          : Array.isArray(style.sprite)
+            ? style.sprite.map((s: unknown) => (isRecord(s) ? s.url : undefined))
+            : [];
+      for (const sprite of sprites) {
+        if (typeof sprite !== 'string' || sprite.includes('#')) continue;
+        const query = sprite.includes('?') ? sprite.indexOf('?') : sprite.length;
+        const scale = ratio > 1 ? '@2x' : '';
+        for (const ext of ['.json', '.png']) {
+          preloadUrl(`${sprite.slice(0, query)}${scale}${ext}${sprite.slice(query)}`);
+        }
+      }
+      if (typeof style.glyphs === 'string') {
+        for (const stack of firstFontStacks(style, zoom)) {
+          preloadUrl(
+            style.glyphs.replaceAll('{fontstack}', percentEncodeFontStack(stack)).replaceAll('{range}', '0-255'),
+          );
+        }
+      }
+    })
+    .catch(() => {});
+}
 
 const post = (msg: FromMlnWorker, transfer: Transferable[] = []) => self.postMessage(msg, transfer);
 
@@ -99,7 +202,9 @@ let handlerPromise: Promise<((msg: ToMlnWorker) => void) | undefined> | null = n
 const earlyQueue: ToMlnWorker[] = [];
 
 self.onmessage = ({ data }: MessageEvent<ToMlnWorker>) => {
-  if (data.type === 'start') {
+  if (data.type === 'preload') {
+    preloadStyle(data.style, data.ratio, data.zoom);
+  } else if (data.type === 'start') {
     handlerPromise = startWorker(data).catch((err: unknown) => {
       fatal('map', err);
       return undefined;
@@ -117,9 +222,14 @@ function normalizeFramePhases(raw: ArrayLike<number>): number[] {
     return arr.slice(0, 8);
   }
   if (arr.length === 6) {
-    // Newer 6-phase layout `[sources, layers, symbols, upload, draw, tasks]` ->
+    // 6-phase layout `[sources, layers, symbols, upload, draw, tasks]` ->
     // canonical 8-slot `[map, tiles, sources, symbols, layers, upload, draw, tasks]`.
     return [0, 0, arr[0] ?? 0, arr[2] ?? 0, arr[1] ?? 0, arr[3] ?? 0, arr[4] ?? 0, arr[5] ?? 0];
+  }
+  if (arr.length === 3) {
+    // Upstream `fd5ef47e` 3-phase layout `[rendering, submitting, tasks]` ->
+    // canonical 8-slot `[map, tiles, sources, symbols, layers(rendering), upload, draw(submitting), tasks]`.
+    return [0, 0, 0, 0, arr[0] ?? 0, 0, arr[1] ?? 0, arr[2] ?? 0];
   }
   while (arr.length < 8) arr.push(0);
   return arr;
@@ -148,7 +258,7 @@ async function startWorker(cfg: MlnStartMessage): Promise<(msg: ToMlnWorker) => 
   let renderingMap: MlnWebMapInstance | undefined;
 
   if (isSessionAbi) {
-    bindings.set_preloads?.(() => undefined);
+    bindings.set_preloads?.(takePreload);
     cfg.ports.forEach((control, idx) => {
       control.onmessage = ({ data }: MessageEvent<{ fatal?: string; replies?: number }>) => {
         if (data && typeof data === 'object') {
@@ -353,6 +463,7 @@ async function startWorker(cfg: MlnStartMessage): Promise<(msg: ToMlnWorker) => 
           debugOn = msg.on;
           emitStats(true);
           break;
+        case 'preload':
         case 'start':
           break;
       }

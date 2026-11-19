@@ -388,7 +388,7 @@ async function waitRunnerReady(page, navStartMs) {
     if (!bridge) return { error: 'no_bridge' };
     const readyInfo = await Promise.race([
       bridge.ready.then((v) => ({ loadedMs: v?.loadedMs ?? 0, timedOut: false })),
-      new Promise((r) => setTimeout(() => r({ loadedMs: performance.now() - t0, timedOut: true }), 8500)),
+      new Promise((r) => setTimeout(() => r({ loadedMs: performance.now() - t0, timedOut: true }), 20000)),
     ]);
     await bridge.waitIdle(3000);
     const e2e =
@@ -635,8 +635,10 @@ function readBundleSizes(distDir) {
   const files = {
     'mln-webgpu': ['wasm/mln/pkg/mln_web_bg.wasm'],
     'mln-shaper': ['wasm/mln/pkg/mln_web_shaper_bg.wasm'],
+    'mln-webgl2': ['wasm/mln/pkg/webgl/mln_web_bg.wasm'],
     'exp-st': ['wasm/exp-st/assets/maplibre_bg.wasm'],
     'exp-st-worker': ['wasm/exp-st/assets/maplibre_tile_worker_bg.wasm'],
+    'exp-webgl2': ['wasm/exp-webgl/assets/maplibre_bg.wasm'],
     'exp-mt': ['wasm/exp-mt/assets/maplibre_bg.wasm'],
   };
   const out = {};

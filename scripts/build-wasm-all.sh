@@ -58,7 +58,7 @@ if [[ "$ONLY" == "all" || "$ONLY" == "mln" ]]; then
     wasm-bindgen --target web --out-dir "$OUT_DIR/mln/pkg" "$CARGO_TARGET_DIR/wasm32-unknown-unknown/$TARGET_SUB/mln_web.wasm"
     wasm-bindgen --target web --out-dir "$OUT_DIR/mln/pkg" "$CARGO_TARGET_DIR/wasm32-unknown-unknown/$TARGET_SUB/mln_web_shaper.wasm"
 
-    cargo build --profile "$CARGO_PROF" --target wasm32-unknown-unknown -p mln-rs-web --features webgl
+    cargo build --profile "$CARGO_PROF" --target wasm32-unknown-unknown -p mln-rs-web --no-default-features --features webgl
     wasm-bindgen --target web --out-dir "$OUT_DIR/mln/pkg/webgl" "$CARGO_TARGET_DIR/wasm32-unknown-unknown/$TARGET_SUB/mln_web.wasm"
 
     if [[ "$PROFILE" == "release" ]] && command -v wasm-opt >/dev/null 2>&1; then

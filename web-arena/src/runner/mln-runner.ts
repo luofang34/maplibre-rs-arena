@@ -59,27 +59,6 @@ export async function createMlnRunner(
 
   emitStatus({ state: 'booting', message: `Fetching & compiling ${cfg.engineId} WASM module…` });
 
-  let wasmResp: Response;
-  try {
-    wasmResp = await fetch(wasmUrl);
-    const ct = wasmResp.headers.get('content-type') ?? '';
-    if (!wasmResp.ok || ct.includes('text/html')) {
-      emitStatus({
-        state: 'missing-wasm',
-        message: 'mln-rs WASM artifacts not found. Run `just build-wasm` locally or trigger the GitHub Actions workflow.',
-      });
-      return makeInertBridge(cfg, 'WASM Not Built');
-    }
-  } catch (err) {
-    emitStatus({
-      state: 'missing-wasm',
-      message: `Failed to fetch ${wasmRel}: ${String(err)}`,
-    });
-    return makeInertBridge(cfg, 'WASM Missing');
-  }
-
-  const module = await WebAssembly.compile(await wasmResp.arrayBuffer());
-
   const ratio = window.devicePixelRatio || 1;
   let width = Math.max(1, canvas.parentElement?.clientWidth || window.innerWidth);
   let height = Math.max(1, canvas.parentElement?.clientHeight || window.innerHeight);
@@ -104,6 +83,36 @@ export async function createMlnRunner(
   });
 
   const postToMap = (msg: ToMlnWorker, transfer: Transferable[] = []) => mapWorker.postMessage(msg, transfer);
+  const resolvedStyleUrl = new URL(cfg.styleUrl, location.origin).href;
+  postToMap({ type: 'preload', style: resolvedStyleUrl, ratio, zoom: cfg.camera.zoom });
+
+  let module: WebAssembly.Module;
+  try {
+    const wasmResp = await fetch(wasmUrl);
+    const ct = wasmResp.headers.get('content-type') ?? '';
+    if (!wasmResp.ok || ct.includes('text/html')) {
+      mapWorker.terminate();
+      for (const tw of tileWorkers) tw.terminate();
+      emitStatus({
+        state: 'missing-wasm',
+        message: 'mln-rs WASM artifacts not found. Run `just build-wasm` locally or trigger the GitHub Actions workflow.',
+      });
+      return makeInertBridge(cfg, 'WASM Not Built');
+    }
+    if (typeof WebAssembly.compileStreaming === 'function' && ct.includes('wasm')) {
+      module = await WebAssembly.compileStreaming(wasmResp);
+    } else {
+      module = await WebAssembly.compile(await wasmResp.arrayBuffer());
+    }
+  } catch (err) {
+    mapWorker.terminate();
+    for (const tw of tileWorkers) tw.terminate();
+    emitStatus({
+      state: 'missing-wasm',
+      message: `Failed to fetch ${wasmRel}: ${String(err)}`,
+    });
+    return makeInertBridge(cfg, 'WASM Missing');
+  }
 
   const ports = tileWorkers.map((tw) => {
     const channel = new MessageChannel();
@@ -221,7 +230,6 @@ export async function createMlnRunner(
   };
 
   const offscreen = canvas.transferControlToOffscreen();
-  const resolvedStyleUrl = new URL(cfg.styleUrl, location.origin).href;
   emitStatus({ state: 'loading', message: 'Loading style and vector tiles…' });
 
   postToMap(

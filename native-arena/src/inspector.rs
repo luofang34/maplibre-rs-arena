@@ -110,7 +110,8 @@ pub fn inspect_capabilities(exp_dir: &Path, mln_dir: &Path) -> Vec<CapabilityRow
     let exp_has_shaper_and_cjk = exp_dir.join("maplibre/src/font/shaper.rs").exists()
         && exp_dir.join("maplibre/src/font/sdf/canvas2d.rs").exists();
 
-    let mln_has_shaper = mln_dir.join("examples/web/shaper").exists()
+    let mln_has_shaper = mln_dir.join("crates/mln_web_shaper").exists()
+        || mln_dir.join("examples/web/shaper").exists()
         || mln_dir.join("crates/mln_text").exists();
 
     vec![

@@ -6,8 +6,8 @@ set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
 sync-local:
     ./scripts/sync-engines.sh local
 
-# Clone or fetch latest upstream commits (mln-rs pinned to baseline 0ca2ff95fb and stays 100% unmodified)
-sync-remote EXP_REF="main" MLN_REF="0ca2ff95fb9026c7d0a4c3edaf6cb29dcdd1800d":
+# Clone or fetch latest upstream commits (mln-rs pinned to baseline fd5ef47e6a and stays 100% unmodified)
+sync-remote EXP_REF="main" MLN_REF="fd5ef47e6a5f8a8c196ed4364584b7a0ee6312d0":
     ./scripts/sync-engines.sh remote "{{EXP_REF}}" "{{MLN_REF}}"
 
 # Build WASM bundles for mln-rs (WebGPU + WebGL2 + Shaper) and maplibre-rs-experimental (ST + MT with arena-telemetry)
