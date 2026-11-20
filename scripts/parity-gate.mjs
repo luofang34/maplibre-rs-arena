@@ -319,7 +319,7 @@ export function evaluateWebParity(captures, opts = {}) {
   const goldenSsimMin = opts.goldenSsimMin ?? 0.95;
   const goldenDiffMax = opts.goldenDiffMax ?? 5.0;
   const crossSsimMin = opts.crossSsimMin ?? 0.65;
-  const crossExtrusionSsimMin = opts.crossExtrusionSsimMin ?? 0.42;
+  const crossExtrusionSsimMin = opts.crossExtrusionSsimMin ?? 0.65;
   const crossDiffMax = opts.crossDiffMax ?? 45.0;
   const parityRefsDir = opts.parityRefsDir || null;
 

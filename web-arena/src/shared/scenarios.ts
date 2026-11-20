@@ -74,12 +74,12 @@ export const SCENARIOS: ScenarioSpec[] = [
   {
     id: 's3-extrusion-3d',
     code: 'S3',
-    title: 'S3 · 3D Fill-Extrusion High-Pitch Orbit (Manhattan 64°)',
+    title: 'S3 · 3D Fill-Extrusion High-Pitch Orbit (Manhattan 60°)',
     category: '3D Extrusion',
     description:
-      '360° orbit over Lower & Midtown Manhattan dense fill-extrusion skyscrapers at 64° pitch, stressing depth sorting, draw calls, and near/far clip planes.',
+      '360° orbit over Lower & Midtown Manhattan dense fill-extrusion skyscrapers at 60° pitch, stressing depth sorting, draw calls, and near/far clip planes.',
     styleUrl: 'https://tiles.openfreemap.org/styles/liberty',
-    initialCamera: { lng: -74.009, lat: 40.7082, zoom: 15.9, bearing: -36, pitch: 64 },
+    initialCamera: { lng: -74.009, lat: 40.7082, zoom: 15.9, bearing: -36, pitch: 60 },
     durationMs: 8000,
     targetBudgetMs: 16.67,
     flightPoseAt: (t) => ({
@@ -87,7 +87,7 @@ export const SCENARIOS: ScenarioSpec[] = [
       lat: lerp(40.706, 40.748, smoothstep(t)),
       zoom: 15.7 + Math.sin(t * Math.PI) * 0.5,
       bearing: -36 + t * 240,
-      pitch: 64,
+      pitch: 60,
     }),
   },
   {
