@@ -1,8 +1,10 @@
 mod diff;
 mod inspector;
+mod parity;
 mod rusage;
 mod stats;
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -10,6 +12,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use inspector::{
     git_short_rev, inspect_capabilities, read_existing_report, read_exp_render_tests_pass_pct,
     render_markdown_summary, Commits, ConformanceSummary, MatrixReport, NativeAbbaRow,
+};
+use parity::{
+    ensure_exp_demo_bin, ensure_mln_bench_bin, run_native_parity_gate, NativeParityConfig,
+    ObservedDraws,
 };
 use rusage::run_measured;
 use stats::{abba_schedule, holm_bonferroni, mann_whitney_u, median};
@@ -29,6 +35,7 @@ fn dispatch(args: &[String]) -> Result<(), String> {
     let sub = args.first().map(String::as_str).unwrap_or("matrix");
     match sub {
         "matrix" => run_matrix_cmd(&args[args.len().min(1)..]),
+        "parity" => run_parity_cmd(&args[1..]),
         "diff" => run_diff_cmd(&args[1..]),
         "--help" | "-h" | "help" => {
             print_help();
@@ -42,9 +49,59 @@ fn print_help() {
     println!(
         "native-arena — Headless ABBA benchmark & conformance orchestrator\n\n\
          USAGE:\n  \
-           native-arena matrix [--live] [--rounds <N>] [--out <json>] [--md <markdown>]\n  \
+           native-arena matrix [--live] [--rounds <N>] [--out <json>] [--md <markdown>] [--no-parity]\n  \
+           native-arena parity [--scenarios s1,s3,s4,s5] [--update-refs] [--draw-tol-pct 5.0] [--skip-build]\n  \
            native-arena diff <left.png> <right.png> [--threshold <0.0..1.0>]"
     );
+}
+
+fn run_parity_cmd(args: &[String]) -> Result<(), String> {
+    let repo_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .ok_or("missing arena root")?;
+    let mut cfg = NativeParityConfig::default();
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--scenarios" => {
+                let v = args.get(i + 1).ok_or("--scenarios requires a list")?;
+                cfg.scenarios = v
+                    .split(',')
+                    .map(|s| s.trim().to_lowercase())
+                    .filter(|s| !s.is_empty())
+                    .collect();
+                i += 2;
+            }
+            "--update-refs" => {
+                cfg.update_refs = true;
+                i += 1;
+            }
+            "--skip-build" => {
+                cfg.skip_build = true;
+                i += 1;
+            }
+            "--draw-tol-pct" => {
+                let v = args.get(i + 1).ok_or("--draw-tol-pct requires a number")?;
+                cfg.draw_tol_pct = v.parse().map_err(|_| "invalid float for --draw-tol-pct")?;
+                i += 2;
+            }
+            flag => return Err(format!("unknown option '{flag}'")),
+        }
+    }
+    let exp_dir = repo_root.join("engines/maplibre-rs-experimental");
+    let mln_dir = repo_root.join("engines/mln-rs");
+    let report = run_native_parity_gate(&exp_dir, &mln_dir, repo_root, &cfg, &HashMap::new())?;
+    for c in &report.checks {
+        println!(
+            "[PARITY PASS] {} | stillDraws={:.1} panDraws={:.1} crossSSIM={:.4} crossDiff={:.2}%",
+            c.scenario,
+            c.still_draws,
+            c.pan_draws,
+            c.cross_ssim.unwrap_or(1.0),
+            c.cross_diff_pct.unwrap_or(0.0)
+        );
+    }
+    Ok(())
 }
 
 fn run_diff_cmd(args: &[String]) -> Result<(), String> {
@@ -66,8 +123,8 @@ fn run_diff_cmd(args: &[String]) -> Result<(), String> {
     }
     let res = diff::compare_png_files(path_a, path_b, threshold)?;
     println!(
-        "{{\"width\":{},\"height\":{},\"mismatchedPixels\":{},\"diffPct\":{:.4}}}",
-        res.width, res.height, res.mismatched_pixels, res.diff_pct
+        "{{\"width\":{},\"height\":{},\"mismatchedPixels\":{},\"diffPct\":{:.4},\"ssim\":{:.4},\"activeSsim\":{:.4},\"nonBlank\":{}}}",
+        res.width, res.height, res.mismatched_pixels, res.diff_pct, res.ssim, res.active_ssim, res.non_blank
     );
     Ok(())
 }
@@ -78,6 +135,7 @@ fn run_matrix_cmd(args: &[String]) -> Result<(), String> {
         .ok_or("missing arena root")?;
 
     let mut live = false;
+    let mut run_parity = true;
     let mut rounds = 5usize;
     let mut json_out = repo_root.join("web-arena/public/reports/latest-matrix.json");
     let mut md_out = repo_root.join("reports/latest-matrix.md");
@@ -87,6 +145,10 @@ fn run_matrix_cmd(args: &[String]) -> Result<(), String> {
         match args[i].as_str() {
             "--live" => {
                 live = true;
+                i += 1;
+            }
+            "--no-parity" => {
+                run_parity = false;
                 i += 1;
             }
             "--rounds" => {
@@ -123,7 +185,13 @@ fn run_matrix_cmd(args: &[String]) -> Result<(), String> {
     let capabilities = inspect_capabilities(&exp_dir, &mln_dir);
 
     let native_abba = if live && exp_dir.exists() && mln_dir.exists() {
-        run_live_abba_probes(&exp_dir, &mln_dir, rounds)?
+        let (rows, observed_draws) = run_live_abba_probes(&exp_dir, &mln_dir, repo_root, rounds)?;
+        if run_parity {
+            let mut parity_cfg = NativeParityConfig::default();
+            parity_cfg.skip_build = true;
+            let _ = run_native_parity_gate(&exp_dir, &mln_dir, repo_root, &parity_cfg, &observed_draws)?;
+        }
+        rows
     } else {
         existing
             .as_ref()
@@ -202,63 +270,16 @@ fn run_matrix_cmd(args: &[String]) -> Result<(), String> {
 fn run_live_abba_probes(
     exp_dir: &Path,
     mln_dir: &Path,
+    repo_root: &Path,
     rounds: usize,
-) -> Result<Vec<NativeAbbaRow>, String> {
+) -> Result<(Vec<NativeAbbaRow>, HashMap<String, ObservedDraws>), String> {
     println!("Building headless release binaries before ABBA timing...");
-    let status_exp = Command::new("cargo")
-        .current_dir(exp_dir)
-        .args(["build", "--release", "-p", "maplibre-demo", "--features", "headless"])
-        .status()
-        .map_err(|e| format!("cargo build maplibre-demo failed: {e}"))?;
-    if !status_exp.success() {
-        return Err("failed to build maplibre-demo --features headless".into());
-    }
-
-    let mln_target_dir = std::env::temp_dir().join("mln-bench-target");
-    let modern_bench = mln_dir.join("tools/bench/profile.toml").is_file();
-    let mln_bin = if modern_bench {
-        let status_mln = Command::new("cargo")
-            .current_dir(mln_dir)
-            .env("CARGO_TARGET_DIR", &mln_target_dir)
-            .env_remove("RUSTFLAGS")
-            .args([
-                "build",
-                "--config",
-                "tools/bench/profile.toml",
-                "--profile",
-                "benchmark",
-                "-p",
-                "mln-rs-bench",
-            ])
-            .status()
-            .map_err(|e| format!("cargo build mln-rs-bench (benchmark profile) failed: {e}"))?;
-        if !status_mln.success() {
-            return Err("failed to build mln-rs-bench (benchmark profile)".into());
-        }
-        let bin = mln_target_dir.join("benchmark/mln-bench");
-        let ensure_script = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .map(|r| r.join("scripts/ensure-mln-fixtures.py"));
-        let status_fix = if let Some(script) = ensure_script.filter(|p| p.is_file()) {
-            Command::new("python3")
-                .arg(&script)
-                .arg(mln_dir)
-                .arg(&bin)
-                .status()
-                .map_err(|e| format!("ensure-mln-fixtures.py failed: {e}"))?
-        } else {
-            Command::new(&bin)
-                .current_dir(mln_dir)
-                .arg("fixtures")
-                .status()
-                .map_err(|e| format!("mln-bench fixtures failed: {e}"))?
-        };
-        if !status_fix.success() {
-            return Err("failed to install mln-bench fixtures".into());
-        }
+    let exp_bin = ensure_exp_demo_bin(exp_dir, false)?;
+    let (mln_bin, modern_bench) = ensure_mln_bench_bin(mln_dir, repo_root, false)?;
+    if modern_bench {
         // Warm up binary pages & Metal shader cache once before timed ABBA rounds.
         let warmup_out = std::env::temp_dir().join("mln-bench-warmup.json");
-        let mut warmup_cmd = Command::new(&bin);
+        let mut warmup_cmd = Command::new(&mln_bin);
         warmup_cmd
             .current_dir(mln_dir)
             .args(["exec", "macro/frame/street"])
@@ -267,17 +288,7 @@ fn run_live_abba_probes(
             warmup_cmd.env("MLN_RENDER_BACKEND", "metal");
         }
         let _ = warmup_cmd.status();
-        bin
     } else {
-        let status_mln = Command::new("cargo")
-            .current_dir(mln_dir)
-            .env("CARGO_TARGET_DIR", &mln_target_dir)
-            .args(["build", "--release", "-p", "mln-rs-bench"])
-            .status()
-            .map_err(|e| format!("cargo build mln-rs-bench failed: {e}"))?;
-        if !status_mln.success() {
-            return Err("failed to build mln-rs-bench".into());
-        }
         let fixtures_dir = std::env::temp_dir().join("mln-bench-fixtures");
         if !fixtures_dir.join("version").is_file() {
             let fixtures_py = mln_dir.join("tools/bench/fixtures.py");
@@ -290,13 +301,12 @@ fn run_live_abba_probes(
                 return Err("failed to prepare /tmp/mln-bench-fixtures".into());
             }
         }
-        mln_target_dir.join("release/mln-bench")
-    };
+    }
 
     let fixtures_dir = std::env::temp_dir().join("mln-bench-fixtures");
-    let exp_bin = exp_dir.join("target/release/maplibre-demo");
     let tmp_png = std::env::temp_dir().join("arena-exp-probe.png");
     let mln_exec_out = std::env::temp_dir().join("mln-bench-exec-out.json");
+    let mut observed_draws: HashMap<String, ObservedDraws> = HashMap::new();
 
     let schedule = abba_schedule(rounds);
     let mut exp_warm_wall = Vec::new();
@@ -326,6 +336,23 @@ fn run_live_abba_probes(
                         if let Some(c) = pan.get("mean_ms").and_then(serde_json::Value::as_f64) {
                             exp_warm_cpu.push(c);
                         }
+                        let s_draws = parsed
+                            .get(0)
+                            .and_then(|r| r.get("still"))
+                            .and_then(|p| p.get("avg_draws"))
+                            .and_then(serde_json::Value::as_f64)
+                            .unwrap_or(0.0);
+                        let p_draws = pan
+                            .get("avg_draws")
+                            .and_then(serde_json::Value::as_f64)
+                            .unwrap_or(0.0);
+                        observed_draws.insert(
+                            "s1".into(),
+                            ObservedDraws {
+                                still_draws: s_draws,
+                                pan_draws: p_draws,
+                            },
+                        );
                     }
                 }
                 exp_rss.push(sample.peak_rss_mib);
@@ -501,6 +528,23 @@ fn run_live_abba_probes(
                     if let Some(row0) = parsed.get(0) {
                         let wall = row0.get("pan_throughput").and_then(|p| p.get("wall_mean_ms")).and_then(serde_json::Value::as_f64).unwrap_or(0.0);
                         let cpu = row0.get("pan_throughput").and_then(|p| p.get("mean_ms")).and_then(serde_json::Value::as_f64).unwrap_or(0.0);
+                        let s_draws = row0
+                            .get("still")
+                            .and_then(|p| p.get("avg_draws"))
+                            .and_then(serde_json::Value::as_f64)
+                            .unwrap_or(0.0);
+                        let p_draws = row0
+                            .get("pan_throughput")
+                            .and_then(|p| p.get("avg_draws"))
+                            .and_then(serde_json::Value::as_f64)
+                            .unwrap_or(0.0);
+                        observed_draws.insert(
+                            arg.into(),
+                            ObservedDraws {
+                                still_draws: s_draws,
+                                pan_draws: p_draws,
+                            },
+                        );
                         let cold = row0.get("cold_first_frame_ms").and_then(serde_json::Value::as_f64).unwrap_or(0.0);
                         let idle = row0.get("idle_redraws").and_then(serde_json::Value::as_u64).unwrap_or(0);
                         let mut mln_globe_wall = 0.0;
@@ -585,7 +629,7 @@ fn run_live_abba_probes(
         }
     }
 
-    Ok(rows)
+    Ok((rows, observed_draws))
 }
 
 fn default_abba_rows() -> Vec<NativeAbbaRow> {

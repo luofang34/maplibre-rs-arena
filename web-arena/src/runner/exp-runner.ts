@@ -400,18 +400,20 @@ export async function createExpRunner(
   onBanner: (status: RunnerStatus) => void,
 ): Promise<RunnerBridge> {
   const isMt = cfg.engineId === 'exp-mt';
+  const isWebGl = cfg.engineId === 'exp-webgl2';
   const eyeOffset = cfg.stereoEyeOffsetDeg ?? 0;
 
   let cameraCb: ((pose: CameraPose) => void) | null = null;
   let telemetryCb: ((sample: NormalizedTelemetry) => void) | null = null;
   let statusCb: ((status: RunnerStatus) => void) | null = null;
+  let lastTelemetry: NormalizedTelemetry | null = null;
 
   const emitStatus = (s: RunnerStatus) => {
     onBanner(s);
     statusCb?.(s);
   };
 
-  if (!('gpu' in navigator) && isMt) {
+  if (!isWebGl && !('gpu' in navigator) && isMt) {
     emitStatus({
       state: 'unsupported',
       message: 'exp-mt requires WebGPU (navigator.gpu) and COOP/COEP headers.',
@@ -428,7 +430,7 @@ export async function createExpRunner(
     return makeFallbackBridge(cfg, 'Requires COOP/COEP');
   }
 
-  const variantDir = isMt ? '/wasm/exp-mt' : '/wasm/exp-st';
+  const variantDir = isMt ? '/wasm/exp-mt' : isWebGl ? '/wasm/exp-webgl' : '/wasm/exp-st';
   const buildRev = typeof __ARENA_BUILD_REV__ === 'string' ? __ARENA_BUILD_REV__ : 'dev';
   const moduleJsUrl = new URL(`${variantDir}/module.js?v=${buildRev}`, location.origin).href;
   const wasmUrl = new URL(`${variantDir}/assets/maplibre_bg.wasm?v=${buildRev}`, location.origin).href;
@@ -496,9 +498,9 @@ export async function createExpRunner(
   });
 
   const fallbackMeter = installWebGpuFallbackMeter((sub) => {
-    if (!telemetryEnabled || !telemetryCb) return;
+    if (!telemetryEnabled) return;
     const cpuTotalMs = sub.uploadMs + sub.encodeMs;
-    telemetryCb({
+    const sample: NormalizedTelemetry = {
       engineId: cfg.engineId,
       timestampMs: performance.now(),
       frameIntervalMs: sub.intervalMs,
@@ -525,7 +527,9 @@ export async function createExpRunner(
       loadedMs,
       settled: pendingRequests === 0,
       camera: currentCamera,
-    });
+    };
+    lastTelemetry = sample;
+    telemetryCb?.(sample);
   });
 
   emitStatus({ state: 'loading', message: 'Initializing wgpu device & rendering pipeline…' });
@@ -610,7 +614,7 @@ export async function createExpRunner(
                 emitStatus({ state: 'ready', message: `Loaded in ${Math.round(loadedMs)} ms`, loadedMs });
                 resolveReady({ loadedMs });
               }
-              telemetryCb?.({
+              const sample: NormalizedTelemetry = {
                 engineId: cfg.engineId,
                 timestampMs: now,
                 frameIntervalMs: interval,
@@ -636,7 +640,9 @@ export async function createExpRunner(
                 loadedMs,
                 settled: t.settled,
                 camera: currentCamera,
-              });
+              };
+              lastTelemetry = sample;
+              telemetryCb?.(sample);
             }
           : null,
       );
@@ -714,12 +720,16 @@ export async function createExpRunner(
     try {
       startedMap = await expMod.startMapLibre(wasmModulePromise, undefined, styleJsonPromise, [], canvas.id, {
         workerWasmPath: workerWasmPromise,
-        webglModulePath: isMt ? undefined : webglModuleUrl,
-        webglWasmPath: isMt ? undefined : webglWasmUrl,
+        webglModulePath: isMt || isWebGl ? undefined : webglModuleUrl,
+        webglWasmPath: isMt || isWebGl ? undefined : webglWasmUrl,
       });
     } catch (err) {
       activeFetchTrackers.delete(fetchTracker);
-      emitStatus({ state: 'missing-wasm', message: `Failed to instantiate ${wasmUrl}: ${String(err)}` });
+      const detail =
+        typeof ErrorEvent !== 'undefined' && err instanceof ErrorEvent
+          ? `${err.message || 'ErrorEvent'} (${err.filename || '?'}:${err.lineno || 0})`
+          : String(err);
+      emitStatus({ state: 'missing-wasm', message: `Failed to instantiate ${wasmUrl}: ${detail}` });
       resolveReady({ loadedMs: 0 });
       return undefined;
     }
@@ -732,7 +742,7 @@ export async function createExpRunner(
       activeFetchTrackers.delete(fetchTracker);
       emitStatus({
         state: 'unsupported',
-        message: 'maplibre-rs-experimental failed to initialize WebGPU on this device.',
+        message: `maplibre-rs-experimental (${cfg.engineId}) failed to initialize ${isWebGl ? 'WebGL2' : 'WebGPU'} on this device.`,
       });
       resolveReady({ loadedMs: 0 });
       return undefined;
@@ -783,7 +793,7 @@ export async function createExpRunner(
 
   return {
     engineId: cfg.engineId,
-    backendLabel: isMt ? 'exp-rs WebGPU (MT)' : 'exp-rs WebGPU (ST)',
+    backendLabel: isMt ? 'exp-rs WebGPU (MT)' : isWebGl ? 'exp-rs WebGL2 (ST)' : 'exp-rs WebGPU (ST)',
     ready,
     getCamera: () => currentCamera,
     followCamera: sendJump,
@@ -800,6 +810,7 @@ export async function createExpRunner(
       if (destroyed && enabled) return;
       wireTelemetry(enabled);
     },
+    getLastTelemetry: () => lastTelemetry,
     onCameraChange: (cb) => {
       cameraCb = cb;
     },
@@ -904,6 +915,7 @@ function makeFallbackBridge(cfg: RunnerStartConfig, label: string): RunnerBridge
     },
     stop: () => {},
     setTelemetryEnabled: () => {},
+    getLastTelemetry: () => null,
     onCameraChange: () => {},
     onTelemetry: () => {},
     onStatus: () => {},

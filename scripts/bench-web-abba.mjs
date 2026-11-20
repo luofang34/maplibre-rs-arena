@@ -9,6 +9,7 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
+import { evaluateWebParity } from './parity-gate.mjs';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const ARENA_ROOT = path.resolve(SCRIPT_DIR, '..');
@@ -134,22 +135,43 @@ function parseArgs(argv) {
     rounds: 3,
     scenarios: ['S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8'],
     engines: ['mln-webgpu', 'exp-st', 'exp-mt'],
+    enginesExplicit: false,
     frames: 240,
     measureWarm: true,
     distDir: path.join(ARENA_ROOT, 'web-arena/dist'),
     jsonOut: path.join(ARENA_ROOT, 'reports/latest-web-abba.json'),
     mdOut: path.join(ARENA_ROOT, 'reports/latest-web-abba.md'),
+    parity: true,
+    parityOnly: false,
+    parityDir: path.join(ARENA_ROOT, 'reports/parity-last'),
+    parityRefsDir: path.join(ARENA_ROOT, 'reports/parity-refs/web'),
+    parityOut: path.join(ARENA_ROOT, 'reports/latest-web-parity.json'),
+    updateParityRefs: false,
+    drawTolPct: 5.0,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--rounds') opts.rounds = Math.max(1, Number(argv[++i]));
     else if (a === '--scenarios') opts.scenarios = argv[++i].split(',').map((s) => s.trim().toUpperCase()).filter(Boolean);
-    else if (a === '--engines') opts.engines = argv[++i].split(',').map((s) => s.trim()).filter(Boolean);
+    else if (a === '--engines') {
+      opts.engines = argv[++i].split(',').map((s) => s.trim()).filter(Boolean);
+      opts.enginesExplicit = true;
+    }
     else if (a === '--frames') opts.frames = Math.max(30, Number(argv[++i]));
     else if (a === '--skip-warm') opts.measureWarm = false;
     else if (a === '--dist') opts.distDir = path.resolve(argv[++i]);
     else if (a === '--json-out') opts.jsonOut = path.resolve(argv[++i]);
     else if (a === '--md-out') opts.mdOut = path.resolve(argv[++i]);
+    else if (a === '--no-parity') opts.parity = false;
+    else if (a === '--parity-only') {
+      opts.parity = true;
+      opts.parityOnly = true;
+      opts.measureWarm = false;
+    } else if (a === '--parity-dir') opts.parityDir = path.resolve(argv[++i]);
+    else if (a === '--parity-refs') opts.parityRefsDir = path.resolve(argv[++i]);
+    else if (a === '--parity-out') opts.parityOut = path.resolve(argv[++i]);
+    else if (a === '--update-parity-refs') opts.updateParityRefs = true;
+    else if (a === '--draw-tol-pct') opts.drawTolPct = Math.max(0.1, Number(argv[++i]));
     else throw new Error(`Unknown CLI flag: ${a}`);
   }
   return opts;
@@ -270,6 +292,7 @@ const SCOPE_GPU_PROBE_SRC = `(() => {
     ttffFirstMapSubmitMs: null,
     phase: 'boot',
     idleSubmits: 0,
+    lastSubmitDraws: 0,
     liveBufBytes: 0,
     peakBufBytes: 0,
   };
@@ -320,6 +343,9 @@ const SCOPE_GPU_PROBE_SRC = `(() => {
     if (typeof origSub === 'function') {
       q.submit = function (cmdBufs) {
         const r = origSub.call(this, cmdBufs);
+        if (cur.draws > 0) {
+          state.lastSubmitDraws = cur.draws;
+        }
         if (cur.draws >= 5 && state.ttffFirstMapSubmitMs === null) {
           state.ttffFirstMapSubmitMs = performance.now() - state.bootT0;
         }
@@ -407,7 +433,7 @@ async function waitRunnerReady(page, navStartMs) {
   return { ...boot, navToReadyMs };
 }
 
-async function runSingle(browser, baseUrl, engineId, scenarioKey, flightFrames, measureWarm) {
+async function runSingle(browser, baseUrl, engineId, scenarioKey, flightFrames, measureWarm, parityCfg = null) {
   if (scenarioKey === 'S7' && engineId === 'mln-webgpu') {
     return { scenario: scenarioKey, engineId, unsupported: true };
   }
@@ -435,7 +461,15 @@ async function runSingle(browser, baseUrl, engineId, scenarioKey, flightFrames, 
       throw new Error(`Boot failed for ${engineId} ${scenarioKey}: ${pageErrors.join('; ')}`);
     }
 
-    // Settle telemetry snapshot before flight
+    const bannerError = await page.evaluate(() => {
+      const el = document.getElementById('runner-banner');
+      if (!el || el.hidden) return null;
+      const title = document.getElementById('banner-title')?.textContent?.trim() || '';
+      const desc = document.getElementById('banner-desc')?.textContent?.trim() || '';
+      return [title, desc].filter(Boolean).join(': ') || 'runner banner visible';
+    });
+
+    // Settle telemetry snapshot & deterministic parity capture at initial camera before flight
     const settledSnap = await page.evaluate(async () => {
       const bridge = window.__arenaRunner;
       let latest = null;
@@ -443,11 +477,60 @@ async function runSingle(browser, baseUrl, engineId, scenarioKey, flightFrames, 
         latest = s;
       });
       bridge.setTelemetryEnabled(true);
-      await new Promise((r) => setTimeout(r, 120));
+      const pose = bridge.getCamera?.();
+      if (pose) {
+        bridge.jumpTo(pose);
+      }
+      await new Promise((r) => setTimeout(r, 250));
+      latest = latest || bridge.getLastTelemetry?.() || null;
       bridge.setTelemetryEnabled(false);
       bridge.onTelemetry(null);
       return latest;
     });
+
+    const bootProbes = await collectAllProbes(page);
+    const probeDraws = Math.max(0, ...bootProbes.map((p) => p.lastSubmitDraws || 0));
+    const settledDrawCalls = Number((probeDraws || settledSnap?.drawCalls || 0).toFixed(0));
+
+    let parityPngPath = null;
+    if (parityCfg?.pngPath) {
+      fs.mkdirSync(path.dirname(parityCfg.pngPath), { recursive: true });
+      await page.locator('#maplibre').screenshot({ path: parityCfg.pngPath, type: 'png' });
+      parityPngPath = parityCfg.pngPath;
+    }
+
+    if (parityCfg?.parityOnly) {
+      await page.evaluate(() => {
+        try { window.__arenaRunner?.destroy(); } catch {}
+      });
+      return {
+        scenario: scenarioKey,
+        engineId,
+        unsupported: false,
+        e2eColdMs: coldBoot.e2eColdMs,
+        engineLoadedMs: coldBoot.engineLoadedMs,
+        warmLoadedMs: null,
+        ttffFirstMapSubmitMs: null,
+        framesSampled: 0,
+        cpuMeanMs: 0,
+        cpuMedianMs: 0,
+        cpuP95Ms: 0,
+        cpuP99Ms: 0,
+        miss90HzPct: 0,
+        miss60HzPct: 0,
+        drawCallsMean: settledDrawCalls,
+        settledDrawCalls,
+        parityPngPath,
+        bannerError,
+        wasmSettledMiB: Number(((settledSnap?.wasmMemoryBytes || 0) / 1048576).toFixed(2)),
+        wasmPeakMiB: Number(((settledSnap?.wasmMemoryBytes || 0) / 1048576).toFixed(2)),
+        gpuSettledMiB: Number(((settledSnap?.gpuMemoryBytes || 0) / 1048576).toFixed(2)),
+        gpuPeakMiB: Number(((settledSnap?.gpuMemoryBytes || 0) / 1048576).toFixed(2)),
+        idleFramesAfterSettle: 0,
+        avgStages: {},
+        errors: pageErrors,
+      };
+    }
 
     // Solo camera flight across fixed frame count (240 frames)
     await setAllScopesPhase(page, 'flight');
@@ -618,6 +701,9 @@ async function runSingle(browser, baseUrl, engineId, scenarioKey, flightFrames, 
       miss90HzPct: Number(((miss90 / n) * 100).toFixed(2)),
       miss60HzPct: Number(((miss60 / n) * 100).toFixed(2)),
       drawCallsMean: mean(draws),
+      settledDrawCalls: settledDrawCalls || Math.round(mean(draws)),
+      parityPngPath,
+      bannerError,
       wasmSettledMiB: Number((settledWasmBytes / 1048576).toFixed(2)),
       wasmPeakMiB: Number((peakWasmBytes / 1048576).toFixed(2)),
       gpuSettledMiB: Number((settledGpuBytes / 1048576).toFixed(2)),
@@ -756,6 +842,20 @@ function renderMarkdown(report) {
     '> **Methodology Notes:** In **S6**, `mln-webgpu` has no `setGeoJsonData` mutation binding (`stepDynamicStress` is a no-op, rendering 0 animated sensors vs 900 animated sensors updated per frame in `exp-st`/`exp-mt`). In **S7**, XR dual-eye stereo rendering is not implemented in `mln-webgpu`.',
     '',
   );
+  if (report.parity?.checks?.length) {
+    lines.push(
+      '## 3. Deterministic Output-Parity Gate (PASS)',
+      '',
+      '| Scenario | Kind | Engine | Baseline | Draws | Delta% | SSIM | Diff% | Status |',
+      '| :--- | :--- | :--- | :--- | ---: | ---: | ---: | ---: | :--- |',
+    );
+    for (const c of report.parity.checks.filter((x) => x.kind !== 'engine-alive')) {
+      lines.push(
+        `| ${c.scenario} | \`${c.kind}\` | \`${c.engine}\` | \`${c.baseline}\` | ${c.draws} / ${c.baselineDraws} | ${Number(c.drawDeltaPct ?? 0).toFixed(2)}% | ${c.ssim !== null ? c.ssim.toFixed(4) : '—'} | ${c.diffPct !== null ? `${c.diffPct.toFixed(2)}%` : '—'} | ${c.ok ? 'PASS' : 'FAIL'} |`,
+      );
+    }
+    lines.push('');
+  }
   return lines.join('\n');
 }
 
@@ -804,23 +904,87 @@ async function main() {
     console.log(`[ABBA] Verified hardware WebGPU adapter: ${adapterInfo}`);
 
     const runs = [];
-    for (let r = 0; r < opts.rounds; r++) {
+    const parityCaptures = [];
+    const hasExpWebglBundle = fs.existsSync(path.join(opts.distDir, 'wasm/exp-webgl/assets/maplibre_bg.wasm'));
+    const roundsToRun = opts.parityOnly ? 1 : opts.rounds;
+
+    for (let r = 0; r < roundsToRun; r++) {
       const rot = r % opts.engines.length;
       const order = [...opts.engines.slice(rot), ...opts.engines.slice(0, rot)];
-      console.log(`\n=== Round ${r + 1}/${opts.rounds} order: ${order.join(' -> ')} ===`);
+      console.log(`\n=== Round ${r + 1}/${roundsToRun} order: ${order.join(' -> ')} ===`);
       for (const scKey of opts.scenarios) {
         for (const eng of order) {
-          const row = await runSingle(browser, srv.baseUrl, eng, scKey, opts.frames, opts.measureWarm);
+          const captureParity = opts.parity && r === 0;
+          const parityCfg = captureParity
+            ? {
+                pngPath: path.join(opts.parityDir, `${scKey}-${eng}.png`),
+                parityOnly: opts.parityOnly,
+              }
+            : opts.parityOnly
+              ? { pngPath: null, parityOnly: true }
+              : null;
+          const row = await runSingle(browser, srv.baseUrl, eng, scKey, opts.frames, opts.measureWarm, parityCfg);
           runs.push(row);
+          if (captureParity) {
+            parityCaptures.push(row);
+          }
           if (row.unsupported) {
             console.log(`[${scKey}] ${eng.padEnd(10)} | Unsupported`);
+          } else if (opts.parityOnly) {
+            console.log(`[${scKey}] ${eng.padEnd(10)} | parity cold=${row.e2eColdMs.toFixed(1)}ms | settledDraws=${row.settledDrawCalls}`);
           } else {
             console.log(
               `[${scKey}] ${eng.padEnd(10)} | cold=${row.e2eColdMs.toFixed(1)}ms warm=${row.warmLoadedMs?.toFixed(1) ?? '-'}ms | cpu=${row.cpuMeanMs.toFixed(2)}/${row.cpuP95Ms.toFixed(2)}/${row.cpuP99Ms.toFixed(2)}ms | >11.1=${row.miss90HzPct}% | draws=${row.drawCallsMean.toFixed(0)} | WASM=${row.wasmPeakMiB}M GPU=${row.gpuPeakMiB}M | idle=${row.idleFramesAfterSettle}`,
             );
           }
         }
+        if (opts.parity && r === 0 && !opts.enginesExplicit && !order.includes('exp-webgl2') && hasExpWebglBundle) {
+          const glRow = await runSingle(browser, srv.baseUrl, 'exp-webgl2', scKey, opts.frames, false, {
+            pngPath: path.join(opts.parityDir, `${scKey}-exp-webgl2.png`),
+            parityOnly: true,
+          });
+          parityCaptures.push(glRow);
+          console.log(`[${scKey}] ${'exp-webgl2'.padEnd(10)} | parity cold=${glRow.e2eColdMs.toFixed(1)}ms | settledDraws=${glRow.settledDrawCalls}`);
+        }
       }
+    }
+
+    let parityReport = null;
+    if (opts.parity) {
+      parityReport = evaluateWebParity(parityCaptures, {
+        drawTolPct: opts.drawTolPct,
+        parityRefsDir: opts.parityRefsDir,
+      });
+      fs.mkdirSync(path.dirname(opts.parityOut), { recursive: true });
+      fs.writeFileSync(opts.parityOut, JSON.stringify(parityReport, null, 2));
+      console.log(`\nWrote Web Parity JSON -> ${opts.parityOut}`);
+      if (!parityReport.passed) {
+        console.error('\n[PARITY GATE FAILED] Refusing to publish speed numbers:');
+        for (const f of parityReport.failures) {
+          console.error(`  - ${f}`);
+        }
+        process.exitCode = 1;
+        return;
+      }
+      if (opts.updateParityRefs) {
+        fs.mkdirSync(opts.parityRefsDir, { recursive: true });
+        const refDraws = {};
+        for (const cap of parityCaptures) {
+          if (cap.engineId === 'exp-st' && !cap.unsupported) {
+            refDraws[cap.scenario] = { settledDrawCalls: cap.settledDrawCalls };
+            if (cap.parityPngPath && fs.existsSync(cap.parityPngPath)) {
+              fs.copyFileSync(cap.parityPngPath, path.join(opts.parityRefsDir, `${cap.scenario}.png`));
+            }
+          }
+        }
+        fs.writeFileSync(path.join(opts.parityRefsDir, 'web-reference.json'), JSON.stringify(refDraws, null, 2));
+        console.log(`Updated golden web parity refs in ${opts.parityRefsDir}`);
+      }
+    }
+
+    if (opts.parityOnly) {
+      console.log('[PARITY GATE PASSED]');
+      return;
     }
 
     const bundleSizes = readBundleSizes(opts.distDir);
@@ -833,6 +997,7 @@ async function main() {
       scenarios: opts.scenarios,
       engines: opts.engines,
       bundleSizes,
+      parity: parityReport,
       matrix,
       rawRuns: runs,
     };

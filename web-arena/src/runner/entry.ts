@@ -57,7 +57,7 @@ async function boot() {
 
   (window as unknown as { __arenaBootStartMs?: number }).__arenaBootStartMs = performance.now();
   let bridge;
-  if (cfg.engineId === 'exp-mt' || cfg.engineId === 'exp-st') {
+  if (cfg.engineId === 'exp-mt' || cfg.engineId === 'exp-st' || cfg.engineId === 'exp-webgl2') {
     bridge = await createExpRunner(cfg, canvas, updateBanner);
   } else if (cfg.engineId === 'mln-webgpu' || cfg.engineId === 'mln-webgl2') {
     bridge = await createMlnRunner(cfg, canvas, updateBanner);

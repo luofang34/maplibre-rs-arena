@@ -79,6 +79,7 @@ export async function createGlJsRunner(
   let lastRenderStart = 0;
   let lastFrameTime = performance.now();
 
+  let lastTelemetry: NormalizedTelemetry | null = null;
   let resolveReady: (v: { loadedMs: number }) => void = () => {};
   const ready = new Promise<{ loadedMs: number }>((resolve) => {
     resolveReady = resolve;
@@ -111,7 +112,7 @@ export async function createGlJsRunner(
   });
 
   map.on('render', () => {
-    if (!telemetryEnabled || !telemetryCb) return;
+    if (!telemetryEnabled) return;
     const now = performance.now();
     const renderCpu = lastRenderStart > 0 ? Math.max(0.05, now - lastRenderStart) : 0.5;
     const interval = Math.max(0.5, now - lastFrameTime);
@@ -119,7 +120,7 @@ export async function createGlJsRunner(
     const heapBytes =
       (performance as unknown as { memory?: { usedJSHeapSize?: number } }).memory?.usedJSHeapSize ?? 0;
 
-    telemetryCb({
+    const sample: NormalizedTelemetry = {
       engineId: 'gl-js',
       timestampMs: now,
       frameIntervalMs: interval,
@@ -143,7 +144,9 @@ export async function createGlJsRunner(
       loadedMs,
       settled: !map.isMoving() && map.loaded(),
       camera: currentCamera,
-    });
+    };
+    lastTelemetry = sample;
+    telemetryCb?.(sample);
   });
 
   return {
@@ -180,6 +183,7 @@ export async function createGlJsRunner(
       telemetryEnabled = enabled;
       if (enabled) map.triggerRepaint();
     },
+    getLastTelemetry: () => lastTelemetry,
     onCameraChange: (cb) => {
       cameraCb = cb;
     },

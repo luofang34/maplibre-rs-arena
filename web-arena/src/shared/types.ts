@@ -1,4 +1,4 @@
-export type EngineId = 'exp-mt' | 'exp-st' | 'mln-webgpu' | 'mln-webgl2' | 'gl-js';
+export type EngineId = 'exp-mt' | 'exp-st' | 'exp-webgl2' | 'mln-webgpu' | 'mln-webgl2' | 'gl-js';
 
 export type ViewMode = 'curtain' | 'side-by-side' | 'blink' | 'diff';
 
@@ -9,7 +9,7 @@ export interface EngineDescriptor {
   repo: 'maplibre-rs-experimental' | 'mln-rs' | 'maplibre-gl-js';
   backend: string;
   requiresCrossOriginIsolated?: boolean;
-  requiresWasmBundle?: 'exp-mt' | 'exp-st' | 'mln-webgpu' | 'mln-webgl2';
+  requiresWasmBundle?: 'exp-mt' | 'exp-st' | 'exp-webgl2' | 'mln-webgpu' | 'mln-webgl2';
 }
 
 export const ENGINES: Record<EngineId, EngineDescriptor> = {
@@ -29,6 +29,14 @@ export const ENGINES: Record<EngineId, EngineDescriptor> = {
     repo: 'maplibre-rs-experimental',
     backend: 'WebGPU + Worker Pool',
     requiresWasmBundle: 'exp-st',
+  },
+  'exp-webgl2': {
+    id: 'exp-webgl2',
+    shortLabel: 'exp-rs (WebGL2)',
+    label: 'maplibre-rs-experimental · WebGL2 Single-Threaded',
+    repo: 'maplibre-rs-experimental',
+    backend: 'WebGL2 + Worker Pool',
+    requiresWasmBundle: 'exp-webgl2',
   },
   'mln-webgpu': {
     id: 'mln-webgpu',
@@ -133,6 +141,7 @@ export interface RunnerBridge {
   jumpTo(pose: CameraPose): void;
   stop(): void;
   setTelemetryEnabled(enabled: boolean): void;
+  getLastTelemetry(): NormalizedTelemetry | null;
   onCameraChange(cb: ((pose: CameraPose) => void) | null): void;
   onTelemetry(cb: ((sample: NormalizedTelemetry) => void) | null): void;
   onStatus(cb: ((status: RunnerStatus) => void) | null): void;
@@ -181,7 +190,12 @@ export interface WasmManifest {
     maplibreRsExperimental: string;
     mlnRs: string;
   };
-  bundles: Partial<Record<'mln-webgpu' | 'mln-shaper' | 'mln-webgl2' | 'exp-st' | 'exp-mt', WasmBundleStat | null>>;
+  bundles: Partial<
+    Record<
+      'mln-webgpu' | 'mln-shaper' | 'mln-webgl2' | 'exp-st' | 'exp-st-worker' | 'exp-webgl2' | 'exp-mt',
+      WasmBundleStat | null
+    >
+  >;
 }
 
 export interface SoloRunMetrics {

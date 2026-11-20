@@ -1,0 +1,67 @@
+{
+  "passed": true,
+  "drawTolPct": 5.0,
+  "checks": [
+    {
+      "scenario": "s1",
+      "stillDraws": 437.0,
+      "panDraws": 404.225,
+      "drawDeltaPct": null,
+      "nonBlank": true,
+      "crossEngine": "macro/load/street",
+      "crossSsim": 0.892,
+      "crossActiveSsim": 0.892,
+      "crossDiffPct": 4.432,
+      "goldenSsim": null,
+      "goldenDiffPct": null,
+      "ok": true,
+      "failureReason": null
+    },
+    {
+      "scenario": "s3",
+      "stillDraws": 253.0,
+      "panDraws": 265.8666666666667,
+      "drawDeltaPct": null,
+      "nonBlank": true,
+      "crossEngine": "macro/load/cjk",
+      "crossSsim": 0.8792,
+      "crossActiveSsim": 0.8792,
+      "crossDiffPct": 6.379,
+      "goldenSsim": null,
+      "goldenDiffPct": null,
+      "ok": true,
+      "failureReason": null
+    },
+    {
+      "scenario": "s4",
+      "stillDraws": 71.0,
+      "panDraws": 71.0,
+      "drawDeltaPct": null,
+      "nonBlank": true,
+      "crossEngine": "macro/load/globe",
+      "crossSsim": 0.9724,
+      "crossActiveSsim": 0.9724,
+      "crossDiffPct": 2.494,
+      "goldenSsim": null,
+      "goldenDiffPct": null,
+      "ok": true,
+      "failureReason": null
+    },
+    {
+      "scenario": "s5",
+      "stillDraws": 9.0,
+      "panDraws": 10.475,
+      "drawDeltaPct": null,
+      "nonBlank": true,
+      "crossEngine": null,
+      "crossSsim": null,
+      "crossActiveSsim": null,
+      "crossDiffPct": null,
+      "goldenSsim": null,
+      "goldenDiffPct": null,
+      "ok": true,
+      "failureReason": null
+    }
+  ],
+  "failures": []
+}

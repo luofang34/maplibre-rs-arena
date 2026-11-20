@@ -46,6 +46,10 @@ native-bench *ARGS:
 web-bench *ARGS: build-web
     node scripts/bench-web-abba.mjs {{ARGS}}
 
+# Run deterministic Web output-parity gate across mln-webgpu, exp-st, exp-mt, and exp-webgl2
+web-parity *ARGS: build-web
+    node scripts/bench-web-abba.mjs --rounds 1 --engines mln-webgpu,exp-st,exp-mt,exp-webgl2 --parity-only {{ARGS}}
+
 # Check native-arena compilation without executing heavy GPU loops
 check-native:
     cargo check --manifest-path native-arena/Cargo.toml

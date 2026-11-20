@@ -10,6 +10,7 @@ engines/
 web-arena/public/wasm/
 web-arena/dist/
 reports/runs/
+reports/parity-last/
 
 # OS & editor files
 .DS_Store

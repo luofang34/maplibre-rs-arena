@@ -137,6 +137,7 @@ export async function createMlnRunner(
   };
   let telemetryEnabled = Boolean(cfg.perfEnabled);
   let followingSilently = false;
+  let lastTelemetry: NormalizedTelemetry | null = null;
 
   let resolveReady: (v: { loadedMs: number }) => void = () => {};
   const ready = new Promise<{ loadedMs: number }>((resolve) => {
@@ -179,9 +180,21 @@ export async function createMlnRunner(
       }
       case 'stats':
         latestStats = data.stats;
+        if (lastTelemetry) {
+          lastTelemetry = {
+            ...lastTelemetry,
+            drawCalls: latestStats.drawCalls,
+            wasmMemoryBytes: latestStats.memory,
+            gpuMemoryBytes: latestStats.gpuMemory,
+            pendingRequests: latestStats.pending,
+            totalRequests: latestStats.requests,
+            loadedMs: latestStats.loadedMs,
+            settled: latestStats.pending === 0,
+          };
+        }
         break;
       case 'frame': {
-        if (!telemetryEnabled || !telemetryCb) break;
+        if (!telemetryEnabled) break;
         const p = data.sample.phases;
         const mapMs = p[0] ?? 0;
         const tilesMs = p[1] ?? 0;
@@ -193,7 +206,7 @@ export async function createMlnRunner(
         const tasksMs = p[7] ?? 0;
         const cpuTotalMs = mapMs + tilesMs + sourcesMs + symbolsMs + layersMs + uploadMs + drawMs + tasksMs;
 
-        telemetryCb({
+        const sample: NormalizedTelemetry = {
           engineId: cfg.engineId,
           timestampMs: performance.now(),
           frameIntervalMs: data.sample.interval,
@@ -217,7 +230,9 @@ export async function createMlnRunner(
           loadedMs: latestStats.loadedMs,
           settled: latestStats.pending === 0,
           camera: currentCamera,
-        });
+        };
+        lastTelemetry = sample;
+        telemetryCb?.(sample);
         break;
       }
       case 'unsupported':
@@ -381,6 +396,7 @@ export async function createMlnRunner(
       telemetryEnabled = enabled;
       postToMap({ type: 'debug', on: enabled });
     },
+    getLastTelemetry: () => lastTelemetry,
     onCameraChange: (cb) => {
       cameraCb = cb;
     },
@@ -431,6 +447,7 @@ function makeInertBridge(cfg: RunnerStartConfig, label: string): RunnerBridge {
     },
     stop: () => {},
     setTelemetryEnabled: () => {},
+    getLastTelemetry: () => null,
     onCameraChange: () => {},
     onTelemetry: () => {},
     onStatus: () => {},
