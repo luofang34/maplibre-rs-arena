@@ -1,10 +1,10 @@
 {
-  "updatedAt": "2026-11-21T03:35:24Z",
+  "updatedAt": "2026-11-21T06:46:07Z",
   "engines": {
     "maplibre-rs-experimental": {
       "repo": "https://github.com/luofang34/maplibre-rs-experimental.git",
       "branch": "main",
-      "rev": "fa6b4552c261534e1ce0aa9c4ca2299ee0d5ccfc"
+      "rev": "0a77203952465e3b0813485d255cc6091fc3aaff"
     },
     "mln-rs": {
       "repo": "https://github.com/louwers/mln-rs.git",
