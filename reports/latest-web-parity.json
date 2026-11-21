@@ -18,10 +18,10 @@
       "scenario": "S1",
       "kind": "engine-alive",
       "engine": "mln-webgpu",
-      "draws": 485,
+      "draws": 437,
       "bannerError": null,
       "nonBlank": true,
-      "lumaStdDev": 34.95,
+      "lumaStdDev": 33.123,
       "ok": true
     },
     {
@@ -84,11 +84,11 @@
       "engine": "exp-st",
       "baseline": "mln-webgpu",
       "draws": 375,
-      "baselineDraws": 485,
-      "drawDeltaPct": -22.68,
-      "ssim": 0.859,
-      "activeSsim": 0.859,
-      "diffPct": 4.935,
+      "baselineDraws": 437,
+      "drawDeltaPct": -14.188,
+      "ssim": 0.8056,
+      "activeSsim": 0.8056,
+      "diffPct": 7.648,
       "ok": true
     },
     {
@@ -97,11 +97,11 @@
       "engine": "exp-mt",
       "baseline": "mln-webgpu",
       "draws": 375,
-      "baselineDraws": 485,
-      "drawDeltaPct": -22.68,
-      "ssim": 0.859,
-      "activeSsim": 0.859,
-      "diffPct": 4.935,
+      "baselineDraws": 437,
+      "drawDeltaPct": -14.188,
+      "ssim": 0.8056,
+      "activeSsim": 0.8056,
+      "diffPct": 7.648,
       "ok": true
     },
     {
@@ -110,11 +110,11 @@
       "engine": "exp-webgl2",
       "baseline": "mln-webgpu",
       "draws": 375,
-      "baselineDraws": 485,
-      "drawDeltaPct": -22.68,
-      "ssim": 0.9322,
-      "activeSsim": 0.9322,
-      "diffPct": 2.642,
+      "baselineDraws": 437,
+      "drawDeltaPct": -14.188,
+      "ssim": 0.8795,
+      "activeSsim": 0.8795,
+      "diffPct": 5.357,
       "ok": true
     },
     {
@@ -124,7 +124,7 @@
       "draws": 325,
       "bannerError": null,
       "nonBlank": true,
-      "lumaStdDev": 18.479,
+      "lumaStdDev": 20.074,
       "ok": true
     },
     {
@@ -189,9 +189,9 @@
       "draws": 271,
       "baselineDraws": 325,
       "drawDeltaPct": -16.615,
-      "ssim": 0.7273,
-      "activeSsim": 0.7273,
-      "diffPct": 8.989,
+      "ssim": 0.762,
+      "activeSsim": 0.762,
+      "diffPct": 8.736,
       "ok": true
     },
     {
@@ -202,9 +202,9 @@
       "draws": 271,
       "baselineDraws": 325,
       "drawDeltaPct": -16.615,
-      "ssim": 0.7273,
-      "activeSsim": 0.7273,
-      "diffPct": 8.989,
+      "ssim": 0.762,
+      "activeSsim": 0.762,
+      "diffPct": 8.736,
       "ok": true
     },
     {
@@ -215,19 +215,19 @@
       "draws": 263,
       "baselineDraws": 325,
       "drawDeltaPct": -19.077,
-      "ssim": 0.72,
-      "activeSsim": 0.72,
-      "diffPct": 9.114,
+      "ssim": 0.7548,
+      "activeSsim": 0.7548,
+      "diffPct": 8.857,
       "ok": true
     },
     {
       "scenario": "S3",
       "kind": "engine-alive",
       "engine": "mln-webgpu",
-      "draws": 348,
+      "draws": 336,
       "bannerError": null,
       "nonBlank": true,
-      "lumaStdDev": 33.829,
+      "lumaStdDev": 33.951,
       "ok": true
     },
     {
@@ -290,11 +290,11 @@
       "engine": "exp-st",
       "baseline": "mln-webgpu",
       "draws": 243,
-      "baselineDraws": 348,
-      "drawDeltaPct": -30.172,
-      "ssim": 0.9117,
-      "activeSsim": 0.9117,
-      "diffPct": 3.781,
+      "baselineDraws": 336,
+      "drawDeltaPct": -27.679,
+      "ssim": 0.912,
+      "activeSsim": 0.912,
+      "diffPct": 3.749,
       "ok": true
     },
     {
@@ -303,11 +303,11 @@
       "engine": "exp-mt",
       "baseline": "mln-webgpu",
       "draws": 243,
-      "baselineDraws": 348,
-      "drawDeltaPct": -30.172,
-      "ssim": 0.9117,
-      "activeSsim": 0.9117,
-      "diffPct": 3.781,
+      "baselineDraws": 336,
+      "drawDeltaPct": -27.679,
+      "ssim": 0.912,
+      "activeSsim": 0.912,
+      "diffPct": 3.749,
       "ok": true
     },
     {
@@ -316,11 +316,11 @@
       "engine": "exp-webgl2",
       "baseline": "mln-webgpu",
       "draws": 243,
-      "baselineDraws": 348,
-      "drawDeltaPct": -30.172,
-      "ssim": 0.9156,
-      "activeSsim": 0.9156,
-      "diffPct": 3.575,
+      "baselineDraws": 336,
+      "drawDeltaPct": -27.679,
+      "ssim": 0.9159,
+      "activeSsim": 0.9159,
+      "diffPct": 3.543,
       "ok": true
     },
     {
@@ -330,7 +330,7 @@
       "draws": 96,
       "bannerError": null,
       "nonBlank": true,
-      "lumaStdDev": 23.722,
+      "lumaStdDev": 30.883,
       "ok": true
     },
     {
@@ -395,9 +395,9 @@
       "draws": 64,
       "baselineDraws": 96,
       "drawDeltaPct": -33.333,
-      "ssim": 0.9264,
-      "activeSsim": 0.8417,
-      "diffPct": 4.807,
+      "ssim": 0.9538,
+      "activeSsim": 0.9007,
+      "diffPct": 3.532,
       "ok": true
     },
     {
@@ -408,9 +408,9 @@
       "draws": 64,
       "baselineDraws": 96,
       "drawDeltaPct": -33.333,
-      "ssim": 0.9264,
-      "activeSsim": 0.8417,
-      "diffPct": 4.807,
+      "ssim": 0.9538,
+      "activeSsim": 0.9007,
+      "diffPct": 3.532,
       "ok": true
     },
     {
@@ -421,9 +421,9 @@
       "draws": 64,
       "baselineDraws": 96,
       "drawDeltaPct": -33.333,
-      "ssim": 0.9254,
-      "activeSsim": 0.8395,
-      "diffPct": 4.863,
+      "ssim": 0.9528,
+      "activeSsim": 0.8986,
+      "diffPct": 3.586,
       "ok": true
     },
     {
@@ -453,7 +453,7 @@
       "draws": 63,
       "bannerError": null,
       "nonBlank": true,
-      "lumaStdDev": 38.874,
+      "lumaStdDev": 38.857,
       "ok": true
     },
     {
@@ -474,8 +474,8 @@
       "draws": 63,
       "baselineDraws": 63,
       "drawDeltaPct": 0,
-      "ssim": 0.9996,
-      "diffPct": 0.003,
+      "ssim": 1,
+      "diffPct": 0,
       "ok": true
     },
     {
@@ -693,23 +693,13 @@
       "draws": 479,
       "bannerError": null,
       "nonBlank": true,
-      "lumaStdDev": 33.389,
+      "lumaStdDev": 32.739,
       "ok": true
     },
     {
       "scenario": "S8",
       "kind": "engine-alive",
       "engine": "exp-st",
-      "draws": 346,
-      "bannerError": null,
-      "nonBlank": true,
-      "lumaStdDev": 38.741,
-      "ok": true
-    },
-    {
-      "scenario": "S8",
-      "kind": "engine-alive",
-      "engine": "exp-mt",
       "draws": 346,
       "bannerError": null,
       "nonBlank": true,
@@ -719,11 +709,21 @@
     {
       "scenario": "S8",
       "kind": "engine-alive",
+      "engine": "exp-mt",
+      "draws": 346,
+      "bannerError": null,
+      "nonBlank": true,
+      "lumaStdDev": 38.56,
+      "ok": true
+    },
+    {
+      "scenario": "S8",
+      "kind": "engine-alive",
       "engine": "exp-webgl2",
       "draws": 346,
       "bannerError": null,
       "nonBlank": true,
-      "lumaStdDev": 39.726,
+      "lumaStdDev": 39.687,
       "ok": true
     },
     {
@@ -734,8 +734,8 @@
       "draws": 346,
       "baselineDraws": 346,
       "drawDeltaPct": 0,
-      "ssim": 0.9875,
-      "diffPct": 0.651,
+      "ssim": 0.9894,
+      "diffPct": 0.565,
       "ok": true
     },
     {
@@ -746,8 +746,8 @@
       "draws": 346,
       "baselineDraws": 346,
       "drawDeltaPct": 0,
-      "ssim": 0.9568,
-      "diffPct": 2.015,
+      "ssim": 0.9641,
+      "diffPct": 1.597,
       "ok": true
     },
     {
@@ -758,9 +758,9 @@
       "draws": 346,
       "baselineDraws": 479,
       "drawDeltaPct": -27.766,
-      "ssim": 0.825,
-      "activeSsim": 0.825,
-      "diffPct": 7.875,
+      "ssim": 0.8276,
+      "activeSsim": 0.8276,
+      "diffPct": 7.979,
       "ok": true
     },
     {
@@ -771,9 +771,9 @@
       "draws": 346,
       "baselineDraws": 479,
       "drawDeltaPct": -27.766,
-      "ssim": 0.8254,
-      "activeSsim": 0.8254,
-      "diffPct": 7.821,
+      "ssim": 0.8285,
+      "activeSsim": 0.8285,
+      "diffPct": 7.889,
       "ok": true
     },
     {
@@ -784,16 +784,16 @@
       "draws": 346,
       "baselineDraws": 479,
       "drawDeltaPct": -27.766,
-      "ssim": 0.8568,
-      "activeSsim": 0.8568,
-      "diffPct": 6.363,
+      "ssim": 0.8584,
+      "activeSsim": 0.8584,
+      "diffPct": 6.525,
       "ok": true
     }
   ],
   "byScenario": {
     "S1": {
       "mln-webgpu": {
-        "settledDrawCalls": 485,
+        "settledDrawCalls": 437,
         "parityPngPath": "/Users/fangluo/maplibre-rs-arena/reports/parity-last/S1-mln-webgpu.png"
       },
       "exp-st": {
@@ -829,7 +829,7 @@
     },
     "S3": {
       "mln-webgpu": {
-        "settledDrawCalls": 348,
+        "settledDrawCalls": 336,
         "parityPngPath": "/Users/fangluo/maplibre-rs-arena/reports/parity-last/S3-mln-webgpu.png"
       },
       "exp-st": {
