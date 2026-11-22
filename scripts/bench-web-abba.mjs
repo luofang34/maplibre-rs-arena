@@ -478,7 +478,10 @@ async function runSingle(browser, baseUrl, engineId, scenarioKey, flightFrames, 
       });
       bridge.setTelemetryEnabled(true);
       const pose = bridge.getCamera?.();
+      await bridge.waitIdle(1500);
       if (pose) {
+        bridge.jumpTo({ ...pose, bearing: (pose.bearing ?? 0) + 1e-4 });
+        await new Promise((r) => setTimeout(r, 60));
         bridge.jumpTo(pose);
       }
       await new Promise((r) => setTimeout(r, 250));
