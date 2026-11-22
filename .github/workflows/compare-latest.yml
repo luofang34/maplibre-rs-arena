@@ -11,9 +11,9 @@ on:
         default: "main"
         type: string
       mln_ref:
-        description: "mln-rs branch, tag, or commit SHA (100% unmodified; pinned to fd5ef47e6a baseline by default)"
+        description: "mln-rs branch, tag, or commit SHA (100% unmodified; pinned to 4d011d9926 baseline by default)"
         required: false
-        default: "fd5ef47e6a5f8a8c196ed4364584b7a0ee6312d0"
+        default: "4d011d99263b982d3425bc4a9e76302e8dd407c3"
         type: string
       deploy:
         description: "Deploy built workbench to Cloudflare"
@@ -43,7 +43,7 @@ jobs:
     timeout-minutes: 45
     env:
       EXP_REF: ${{ inputs.exp_ref || 'main' }}
-      MLN_REF: ${{ inputs.mln_ref || 'fd5ef47e6a5f8a8c196ed4364584b7a0ee6312d0' }}
+      MLN_REF: ${{ inputs.mln_ref || '4d011d99263b982d3425bc4a9e76302e8dd407c3' }}
       DEPLOY_TARGET: ${{ inputs.deploy_target || 'workers' }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN || secrets.CF_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || secrets.CF_ACCOUNT_ID }}

@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MODE="${1:-local}"
 EXP_REF="${2:-main}"
-MLN_REF="${3:-fd5ef47e6a5f8a8c196ed4364584b7a0ee6312d0}"
+MLN_REF="${3:-4d011d99263b982d3425bc4a9e76302e8dd407c3}"
 
 mkdir -p "$ROOT/engines"
 

@@ -1,15 +1,15 @@
 {
-  "updatedAt": "2026-11-21T16:15:51Z",
+  "updatedAt": "2026-11-22T13:07:22Z",
   "engines": {
     "maplibre-rs-experimental": {
       "repo": "https://github.com/luofang34/maplibre-rs-experimental.git",
       "branch": "main",
-      "rev": "cda7d7a1a7628c9d02ea8b6b62dbf1fb2d692696"
+      "rev": "e04446d53af9ebf47aa42cfaf17f2b99c84a4fe2"
     },
     "mln-rs": {
       "repo": "https://github.com/louwers/mln-rs.git",
-      "branch": "fd5ef47e6a5f8a8c196ed4364584b7a0ee6312d0",
-      "rev": "fd5ef47e6a5f8a8c196ed4364584b7a0ee6312d0"
+      "branch": "4d011d99263b982d3425bc4a9e76302e8dd407c3",
+      "rev": "4d011d99263b982d3425bc4a9e76302e8dd407c3"
     },
     "maplibre-gl-js": {
       "npm": "maplibre-gl",
