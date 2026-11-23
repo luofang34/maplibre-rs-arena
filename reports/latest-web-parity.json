@@ -21,7 +21,7 @@
       "draws": 484,
       "bannerError": null,
       "nonBlank": true,
-      "lumaStdDev": 34.712,
+      "lumaStdDev": 34.956,
       "ok": true
     },
     {
@@ -86,9 +86,9 @@
       "draws": 375,
       "baselineDraws": 484,
       "drawDeltaPct": -22.521,
-      "ssim": 0.8557,
-      "activeSsim": 0.8557,
-      "diffPct": 5.173,
+      "ssim": 0.8591,
+      "activeSsim": 0.8591,
+      "diffPct": 4.931,
       "ok": true
     },
     {
@@ -99,9 +99,9 @@
       "draws": 375,
       "baselineDraws": 484,
       "drawDeltaPct": -22.521,
-      "ssim": 0.8557,
-      "activeSsim": 0.8557,
-      "diffPct": 5.173,
+      "ssim": 0.8591,
+      "activeSsim": 0.8591,
+      "diffPct": 4.931,
       "ok": true
     },
     {
@@ -112,9 +112,9 @@
       "draws": 375,
       "baselineDraws": 484,
       "drawDeltaPct": -22.521,
-      "ssim": 0.9288,
-      "activeSsim": 0.9288,
-      "diffPct": 2.885,
+      "ssim": 0.9321,
+      "activeSsim": 0.9321,
+      "diffPct": 2.644,
       "ok": true
     },
     {
@@ -124,7 +124,7 @@
       "draws": 337,
       "bannerError": null,
       "nonBlank": true,
-      "lumaStdDev": 21.025,
+      "lumaStdDev": 22.147,
       "ok": true
     },
     {
@@ -189,9 +189,9 @@
       "draws": 271,
       "baselineDraws": 337,
       "drawDeltaPct": -19.585,
-      "ssim": 0.771,
-      "activeSsim": 0.771,
-      "diffPct": 8.579,
+      "ssim": 0.7785,
+      "activeSsim": 0.7785,
+      "diffPct": 8.494,
       "ok": true
     },
     {
@@ -202,9 +202,9 @@
       "draws": 271,
       "baselineDraws": 337,
       "drawDeltaPct": -19.585,
-      "ssim": 0.771,
-      "activeSsim": 0.771,
-      "diffPct": 8.579,
+      "ssim": 0.7785,
+      "activeSsim": 0.7785,
+      "diffPct": 8.494,
       "ok": true
     },
     {
@@ -215,9 +215,9 @@
       "draws": 263,
       "baselineDraws": 337,
       "drawDeltaPct": -21.958,
-      "ssim": 0.7638,
-      "activeSsim": 0.7638,
-      "diffPct": 8.696,
+      "ssim": 0.7714,
+      "activeSsim": 0.7714,
+      "diffPct": 8.612,
       "ok": true
     },
     {
@@ -227,7 +227,7 @@
       "draws": 465,
       "bannerError": null,
       "nonBlank": true,
-      "lumaStdDev": 34.485,
+      "lumaStdDev": 34.061,
       "ok": true
     },
     {
@@ -247,7 +247,7 @@
       "draws": 243,
       "bannerError": null,
       "nonBlank": true,
-      "lumaStdDev": 36.51,
+      "lumaStdDev": 36.55,
       "ok": true
     },
     {
@@ -257,7 +257,7 @@
       "draws": 243,
       "bannerError": null,
       "nonBlank": true,
-      "lumaStdDev": 36.892,
+      "lumaStdDev": 36.852,
       "ok": true
     },
     {
@@ -268,8 +268,8 @@
       "draws": 243,
       "baselineDraws": 243,
       "drawDeltaPct": 0,
-      "ssim": 1,
-      "diffPct": 0,
+      "ssim": 0.9977,
+      "diffPct": 0.102,
       "ok": true
     },
     {
@@ -280,8 +280,8 @@
       "draws": 243,
       "baselineDraws": 243,
       "drawDeltaPct": 0,
-      "ssim": 0.9806,
-      "diffPct": 0.532,
+      "ssim": 0.9828,
+      "diffPct": 0.429,
       "ok": true
     },
     {
@@ -292,9 +292,9 @@
       "draws": 243,
       "baselineDraws": 465,
       "drawDeltaPct": -47.742,
-      "ssim": 0.8472,
-      "activeSsim": 0.8472,
-      "diffPct": 6.826,
+      "ssim": 0.8483,
+      "activeSsim": 0.8483,
+      "diffPct": 6.746,
       "ok": true
     },
     {
@@ -305,9 +305,9 @@
       "draws": 243,
       "baselineDraws": 465,
       "drawDeltaPct": -47.742,
-      "ssim": 0.8472,
-      "activeSsim": 0.8472,
-      "diffPct": 6.826,
+      "ssim": 0.8473,
+      "activeSsim": 0.8473,
+      "diffPct": 6.812,
       "ok": true
     },
     {
@@ -318,9 +318,9 @@
       "draws": 243,
       "baselineDraws": 465,
       "drawDeltaPct": -47.742,
-      "ssim": 0.8501,
-      "activeSsim": 0.8501,
-      "diffPct": 6.693,
+      "ssim": 0.8522,
+      "activeSsim": 0.8522,
+      "diffPct": 6.546,
       "ok": true
     },
     {
@@ -330,7 +330,7 @@
       "draws": 86,
       "bannerError": null,
       "nonBlank": true,
-      "lumaStdDev": 41.495,
+      "lumaStdDev": 40.93,
       "ok": true
     },
     {
@@ -395,9 +395,9 @@
       "draws": 54,
       "baselineDraws": 86,
       "drawDeltaPct": -37.209,
-      "ssim": 0.9715,
-      "activeSsim": 0.9386,
-      "diffPct": 1.686,
+      "ssim": 0.9708,
+      "activeSsim": 0.9372,
+      "diffPct": 1.853,
       "ok": true
     },
     {
@@ -408,9 +408,9 @@
       "draws": 54,
       "baselineDraws": 86,
       "drawDeltaPct": -37.209,
-      "ssim": 0.9715,
-      "activeSsim": 0.9386,
-      "diffPct": 1.686,
+      "ssim": 0.9708,
+      "activeSsim": 0.9372,
+      "diffPct": 1.853,
       "ok": true
     },
     {
@@ -421,9 +421,9 @@
       "draws": 54,
       "baselineDraws": 86,
       "drawDeltaPct": -37.209,
-      "ssim": 0.9704,
-      "activeSsim": 0.9363,
-      "diffPct": 1.739,
+      "ssim": 0.9697,
+      "activeSsim": 0.9348,
+      "diffPct": 1.906,
       "ok": true
     },
     {
@@ -453,7 +453,7 @@
       "draws": 63,
       "bannerError": null,
       "nonBlank": true,
-      "lumaStdDev": 39.189,
+      "lumaStdDev": 38.857,
       "ok": true
     },
     {
@@ -474,8 +474,8 @@
       "draws": 63,
       "baselineDraws": 63,
       "drawDeltaPct": 0,
-      "ssim": 0.9722,
-      "diffPct": 0.161,
+      "ssim": 0.9996,
+      "diffPct": 0.003,
       "ok": true
     },
     {
@@ -693,7 +693,7 @@
       "draws": 465,
       "bannerError": null,
       "nonBlank": true,
-      "lumaStdDev": 33.632,
+      "lumaStdDev": 32.924,
       "ok": true
     },
     {
@@ -703,7 +703,7 @@
       "draws": 422,
       "bannerError": null,
       "nonBlank": true,
-      "lumaStdDev": 38.699,
+      "lumaStdDev": 38.64,
       "ok": true
     },
     {
@@ -713,7 +713,7 @@
       "draws": 422,
       "bannerError": null,
       "nonBlank": true,
-      "lumaStdDev": 38.56,
+      "lumaStdDev": 38.607,
       "ok": true
     },
     {
@@ -734,8 +734,8 @@
       "draws": 422,
       "baselineDraws": 422,
       "drawDeltaPct": 0,
-      "ssim": 0.9817,
-      "diffPct": 1.001,
+      "ssim": 0.9699,
+      "diffPct": 1.535,
       "ok": true
     },
     {
@@ -746,8 +746,8 @@
       "draws": 422,
       "baselineDraws": 422,
       "drawDeltaPct": 0,
-      "ssim": 0.9395,
-      "diffPct": 2.886,
+      "ssim": 0.942,
+      "diffPct": 2.714,
       "ok": true
     },
     {
@@ -758,9 +758,9 @@
       "draws": 422,
       "baselineDraws": 465,
       "drawDeltaPct": -9.247,
-      "ssim": 0.8328,
-      "activeSsim": 0.8328,
-      "diffPct": 7.759,
+      "ssim": 0.8318,
+      "activeSsim": 0.8318,
+      "diffPct": 7.929,
       "ok": true
     },
     {
@@ -771,9 +771,9 @@
       "draws": 422,
       "baselineDraws": 465,
       "drawDeltaPct": -9.247,
-      "ssim": 0.8339,
-      "activeSsim": 0.8339,
-      "diffPct": 7.694,
+      "ssim": 0.8325,
+      "activeSsim": 0.8325,
+      "diffPct": 7.877,
       "ok": true
     },
     {
@@ -784,9 +784,9 @@
       "draws": 422,
       "baselineDraws": 465,
       "drawDeltaPct": -9.247,
-      "ssim": 0.8676,
-      "activeSsim": 0.8676,
-      "diffPct": 6.139,
+      "ssim": 0.8654,
+      "activeSsim": 0.8654,
+      "diffPct": 6.329,
       "ok": true
     }
   ],
